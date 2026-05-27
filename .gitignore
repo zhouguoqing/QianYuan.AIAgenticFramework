@@ -1,0 +1,19 @@
+bin/
+obj/
+*.user
+
+# Launcher runtime state (.runtime/ holds pid files + logs)
+.runtime/
+
+# Frontend
+src/QianYuan.Web/node_modules/
+src/QianYuan.Web/dist/
+src/QianYuan.Web/.vite/
+
+# Runtime sandboxes
+_sandbox/
+
+# Local secrets
+appsettings.Development.json
+secrets.json
+.env
