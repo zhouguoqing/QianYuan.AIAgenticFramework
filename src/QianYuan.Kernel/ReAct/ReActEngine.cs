@@ -353,7 +353,7 @@ public sealed class ReActEngine
 
 public sealed class ReActEngineOptions
 {
-    public int MaxIterations { get; init; } = 10;
+    public int MaxIterations { get; init; } = 100;
     public string? Model { get; init; }
     public float? Temperature { get; init; } = 0.4f;
     public int? MaxOutputTokens { get; init; }

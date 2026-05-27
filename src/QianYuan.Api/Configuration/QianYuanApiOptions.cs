@@ -5,6 +5,7 @@ public sealed class QianYuanApiOptions
 {
     public string DefaultAgentId { get; set; } = "qianyuan.default";
     public string? DefaultProviderId { get; set; }
+    public int DefaultAgentMaxIterations { get; set; } = 100;
 
     public OpenAIProviderOptions[] OpenAICompatProviders { get; set; } = Array.Empty<OpenAIProviderOptions>();
     public AzureOpenAIProviderOptions[] AzureOpenAIProviders { get; set; } = Array.Empty<AzureOpenAIProviderOptions>();

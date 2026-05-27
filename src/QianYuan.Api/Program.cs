@@ -140,7 +140,7 @@ builder.Services.AddReActAgent(new ReActAgentDefinition
         "工具会根据用户意图渐进式加载——只暴露当前可能用到的技能。",
     PreferredProviderId = qy.DefaultProviderId,
     Temperature = 0.4f,
-    MaxIterations = 12,
+    MaxIterations = qy.DefaultAgentMaxIterations,
     Tags = ["default"],
 });
 

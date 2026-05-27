@@ -198,6 +198,15 @@ ToolCallEnd / ToolObservation / Usage / End / Error / Warning)，
 4. 没有新 ToolCall → 终止，发 `End`。
 
 每轮都会重新计算活动 Skill 集合，所以"渐进式扩展"是自动发生的。
+默认 Agent 的最大 ReAct 迭代次数由 `QianYuan.DefaultAgentMaxIterations` 控制，默认值为 `100`；单次请求仍可通过 `MaxIterations` 覆盖。
+
+```json
+{
+  "QianYuan": {
+    "DefaultAgentMaxIterations": 100
+  }
+}
+```
 
 ## MCP
 
@@ -224,6 +233,17 @@ ToolCallEnd / ToolObservation / Usage / End / Error / Warning)，
 QianYuan 支持三类 Skill 来源：代码实现的 `ISkill`、目录中的 Markdown Skill、以及外部 MCP Server 暴露的工具。
 所有来源最终都会进入 `ISkillManager`，以统一的 manifest 参与渐进式选择；当某个 Skill 被选中时，它的工具会进入 LLM tools，
 它的 `SystemPromptFragment` 也会注入当前轮 system prompt。
+
+Skill 能力分层：
+
+| 类型 | 能力 | 典型用途 | 是否暴露工具 |
+|------|------|----------|--------------|
+| Markdown Skill | 根据 `SKILL.md` 注入领域提示 | code review、需求分析、API 设计规范 | 否 |
+| 内置 Skill | Web 搜索、视觉、文件系统、脚本执行 | 联网查询、图片理解、沙箱文件读写、运行代码片段 | 是 |
+| 自定义 `ISkill` | 任意业务工具或系统集成 | 调内部服务、工作流编排、专有数据查询 | 是 |
+| MCP Skill | 调用外部 MCP Server 工具 | filesystem、browser、database、第三方工具生态 | 是 |
+
+其中脚本执行由内置 `qianyuan.code` Skill 提供，MCP Server 调用由 `McpSkill` 适配为一组命名空间化工具。
 
 ### Markdown Skill 文件体系
 
@@ -384,9 +404,63 @@ manager.Register(
   sp => new MySkill());
 ```
 
+### 脚本执行 Skill
+
+内置 Code Execution Skill 会暴露 `code_run` 工具，用于在沙箱目录中执行短脚本。默认关闭，需要显式启用：
+
+```json
+{
+  "QianYuan": {
+    "CodeExecution": {
+      "Enabled": true,
+      "SandboxDirectory": "./_sandbox/code",
+      "AllowedRuntimes": ["python", "node"],
+      "TimeoutSeconds": 20
+    }
+  }
+}
+```
+
+启用后启动流程会注册：
+
+```csharp
+builder.Services.AddCodeExecutionSkill(new CodeExecutionOptions
+{
+    SandboxDirectory = cx.SandboxDirectory,
+    AllowedRuntimes = new HashSet<string>(cx.AllowedRuntimes, StringComparer.OrdinalIgnoreCase),
+    PerCallTimeout = TimeSpan.FromSeconds(cx.TimeoutSeconds),
+});
+```
+
+工具协议：
+
+```json
+{
+  "runtime": "python",
+  "code": "print(1 + 1)"
+}
+```
+
+当前支持的运行时由 `AllowedRuntimes` 控制，内置实现支持 `python`、`node`、`bash`；建议生产环境只开放必要运行时，并把 `SandboxDirectory` 指向隔离目录。
+
 ### MCP Skill 注册
 
 外部 MCP Server 可以作为 Skill 挂载。配置 stdio server 后，启动时调用 `MountMcpSkills()`，每个 MCP client 会被适配成一个 `McpSkill`：
+
+```json
+{
+  "QianYuan": {
+    "McpServers": [
+      {
+        "ServerId": "fs",
+        "Command": "npx",
+        "Arguments": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+        "Environment": {}
+      }
+    ]
+  }
+}
+```
 
 ```csharp
 builder.Services.AddMcpStdioServer(new McpStdioServerConfig
@@ -398,6 +472,8 @@ builder.Services.AddMcpStdioServer(new McpStdioServerConfig
 
 app.Services.MountMcpSkills();
 ```
+
+挂载后 Skill ID 为 `mcp.<serverId>`，工具名会统一前缀化为 `mcp.<serverId>.<toolName>`，避免多个 MCP Server 之间的工具名冲突。工具列表会延迟到第一次需要该 Skill 时通过 MCP `ListTools` 获取，调用时再转发到对应 MCP Server 的 `CallTool`。
 
 ### 注册生命周期
 

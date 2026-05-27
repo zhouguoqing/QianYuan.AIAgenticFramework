@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using QianYuan.Core.Abstractions;
+using QianYuan.Core.Exceptions;
 using QianYuan.Core.Models;
 using QianYuan.Core.Streaming;
 using QianYuan.Kernel.Agents;
@@ -91,6 +92,50 @@ public class ReActEngineTests
             s.Contains("base prompt", StringComparison.Ordinal)
             && s.Contains("Active skills: prompt", StringComparison.Ordinal)
             && s.Contains("Always use examples before abstractions.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Engine_request_max_iterations_overrides_default_options()
+    {
+        var skills = new SkillManager(EmptyServices.Instance, NullLogger<SkillManager>.Instance);
+        skills.Register(new EchoSkill());
+
+        var provider = new ScriptedProvider(new[]
+        {
+            new StreamingChunk[]
+            {
+                StreamingChunk.Start(),
+                new StreamingChunk { Kind = StreamingChunkKind.ToolCallStart, ToolCallId = "t1", ToolName = "echo" },
+                new StreamingChunk { Kind = StreamingChunkKind.ToolCallEnd, ToolCallId = "t1", ToolName = "echo", ToolArgsJson = "{\"msg\":\"again\"}" },
+                StreamingChunk.End("tool_use"),
+            },
+            new StreamingChunk[]
+            {
+                StreamingChunk.Start(),
+                StreamingChunk.OfText("would exceed request limit"),
+                StreamingChunk.End("stop"),
+            }
+        });
+
+        var engine = new ReActEngine(provider, skills, new AgentRegistry(), NullLogger<ReActEngine>.Instance,
+            new ReActEngineOptions { MaxIterations = 100, UseProgressiveSelection = false, ExposeAgentsAsTools = false });
+
+        var act = async () =>
+        {
+            await foreach (var _ in engine.RunAsync(new ReActRunRequest
+            {
+                InitialMessages = new[] { ChatMessage.User("keep using a tool") },
+                SessionId = "s",
+                Services = EmptyServices.Instance,
+                Dispatcher = new SimpleDispatcher(skills),
+                PreloadSkills = new[] { "echo" },
+                MaxIterations = 1,
+            })) { }
+        };
+
+        var exception = await act.Should().ThrowAsync<ReActIterationLimitException>()
+            .WithMessage("ReAct iteration limit (1) exceeded.");
+        exception.Which.Limit.Should().Be(1);
     }
 
     private sealed class EchoSkill : ISkill

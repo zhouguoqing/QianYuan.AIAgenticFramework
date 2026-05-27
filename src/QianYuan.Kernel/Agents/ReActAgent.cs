@@ -145,7 +145,7 @@ public sealed class ReActAgentDefinition
     public string? PreferredModel { get; init; }
     public float? Temperature { get; init; } = 0.4f;
     public int? MaxOutputTokens { get; init; }
-    public int MaxIterations { get; init; } = 10;
+    public int MaxIterations { get; init; } = 100;
 
     public bool UseProgressiveSkillLoading { get; init; } = true;
     public int ProgressiveTopK { get; init; } = 8;
