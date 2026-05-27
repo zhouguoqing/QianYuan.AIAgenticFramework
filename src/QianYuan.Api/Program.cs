@@ -5,6 +5,7 @@ using QianYuan.Core.Abstractions;
 using QianYuan.Integrations.DingTalk;
 using QianYuan.Kernel;
 using QianYuan.Kernel.Agents;
+using QianYuan.Kernel.Skills;
 using QianYuan.Mcp;
 using QianYuan.Mcp.Client;
 using QianYuan.Providers.Anthropic;
@@ -174,6 +175,13 @@ var app = builder.Build();
 // Mount skills and agents into the registries.
 app.Services.RegisterProvidersFromServices(qy.DefaultProviderId);
 app.Services.RegisterSkillsFromServices();
+app.Services.RegisterMarkdownSkillsFromDirectories(qy.SkillDirectories.Select(d => new MarkdownSkillDirectoryOptions
+{
+    Path = d.Path,
+    Recursive = d.Recursive,
+    Enabled = d.Enabled,
+    IdPrefix = d.IdPrefix,
+}));
 app.Services.MountMcpSkills();
 app.Services.RegisterAgentsFromServices();
 

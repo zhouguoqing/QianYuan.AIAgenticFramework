@@ -10,6 +10,7 @@
 | 语言/平台 | C# 13 / .NET 10 |
 | Agent 模式 | ReAct (Thought-Action-Observation) 循环；Agent-as-Tool 嵌套调用 |
 | Skill 体系 | 抽象 `ISkill` + `SkillManager` 渐进式加载；按用户意图打分挑选 topK |
+| Markdown Skill | 从指定目录递归加载业界常见 `Skill.md` / `SKILL.md`，将 frontmatter 映射为 Skill 清单，正文作为激活后的系统提示 |
 | 模型 Provider | OpenAI 兼容 (GPT/Kimi/MiniMax/Qwen-compat/DeepSeek/OpenRouter/NEWAPI)、Azure OpenAI、Anthropic Claude、Google Gemini、Qwen DashScope 原生 |
 | 多模态 | 文本 + 图像 (URL / base64) + 工具调用 |
 | 流式输出 | SSE (`/api/chat/stream`) + SignalR Hub (`/hubs/chat`) |
@@ -217,6 +218,71 @@ ToolCallEnd / ToolObservation / Usage / End / Error / Warning)，
   适合本地开发和轻量场景；DDG 会限速，重负载请改用付费服务。
 - `tavily` / `bing` / `brave`：填入相应平台的 `ApiKey` 即可。
 - 任何 Provider 的 ApiKey 为空时，框架会自动回退到 DuckDuckGo。
+
+## 从目录加载 Markdown Skill
+
+可以把 Claude/Copilot/Cursor 等常见的 `Skill.md` / `SKILL.md` 目录挂载到 QianYuan。框架会读取 YAML frontmatter 中的
+`name`、`description`、`tags`、`id` 等字段，注册成渐进式 Skill；当该 Skill 被选中时，Markdown 正文会注入系统提示。
+
+```json
+{
+  "QianYuan": {
+    "SkillDirectories": [
+      {
+        "Path": "./samples/skills",
+        "Recursive": true,
+        "Enabled": true,
+        "IdPrefix": "sample"
+      },
+      {
+        "Path": "/Users/you/.agents/skills",
+        "Recursive": true,
+        "Enabled": true,
+        "IdPrefix": "agent"
+      }
+    ]
+  }
+}
+```
+
+支持的典型结构：
+
+```text
+skills/
+  code-review/
+    SKILL.md
+  pdf/
+    Skill.md
+```
+
+仓库内置了一个可直接动态加载的示例目录：
+
+```text
+samples/skills/
+  api-design/SKILL.md
+  code-review/SKILL.md
+  debugging/SKILL.md
+  docs-writing/SKILL.md
+  requirements-analysis/SKILL.md
+```
+
+默认 `appsettings.json` 已启用 `./samples/skills`。启动 API 后可通过 `GET /api/skills` 查看这些示例 Skill 是否注册成功。
+
+示例 `SKILL.md`：
+
+```markdown
+---
+name: code-review
+description: Review code for bugs, regressions, and missing tests
+tags: [review, testing]
+---
+
+# Code Review
+
+Prioritize correctness issues before style comments.
+```
+
+这类 Markdown Skill 是“提示型技能”，不会执行外部命令或暴露工具调用；需要真实工具能力时仍建议实现 `ISkill` 或通过 MCP 挂载。
 
 ## 钉钉
 

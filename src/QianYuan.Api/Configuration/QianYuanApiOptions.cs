@@ -16,6 +16,7 @@ public sealed class QianYuanApiOptions
     public FileSystemSkillOptions? FileSystemSkill { get; set; }
     public bool EnableVisionSkill { get; set; } = true;
     public CodeSkillOptions? CodeExecution { get; set; }
+    public SkillDirectoryOptions[] SkillDirectories { get; set; } = Array.Empty<SkillDirectoryOptions>();
 
     public McpServerEntry[] McpServers { get; set; } = Array.Empty<McpServerEntry>();
     public DingTalkConfig? DingTalk { get; set; }
@@ -101,6 +102,14 @@ public sealed class CodeSkillOptions
     public bool Enabled { get; set; }
     public string[] AllowedRuntimes { get; set; } = ["python", "node"];
     public int TimeoutSeconds { get; set; } = 20;
+}
+
+public sealed class SkillDirectoryOptions
+{
+    public string Path { get; set; } = "";
+    public bool Recursive { get; set; } = true;
+    public bool Enabled { get; set; } = true;
+    public string IdPrefix { get; set; } = "skill";
 }
 
 public sealed class McpServerEntry

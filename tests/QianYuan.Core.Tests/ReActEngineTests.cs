@@ -58,6 +58,41 @@ public class ReActEngineTests
         output.Last().Kind.Should().Be(StreamingChunkKind.End);
     }
 
+    [Fact]
+    public async Task Engine_includes_active_skill_prompt_fragments_in_system_message()
+    {
+        var skills = new SkillManager(EmptyServices.Instance, NullLogger<SkillManager>.Instance);
+        skills.Register(new PromptSkill());
+
+        var provider = new ScriptedProvider(new[]
+        {
+            new StreamingChunk[]
+            {
+                StreamingChunk.Start(),
+                StreamingChunk.OfText("done"),
+                StreamingChunk.End("stop"),
+            }
+        });
+
+        var engine = new ReActEngine(provider, skills, new AgentRegistry(), NullLogger<ReActEngine>.Instance,
+            new ReActEngineOptions { MaxIterations = 2, UseProgressiveSelection = false, ExposeAgentsAsTools = false });
+
+        await foreach (var _ in engine.RunAsync(new ReActRunRequest
+        {
+            InitialMessages = new[] { ChatMessage.User("write tests") },
+            SessionId = "s",
+            Services = EmptyServices.Instance,
+            Dispatcher = new SimpleDispatcher(skills),
+            SystemPrompt = "base prompt",
+            PreloadSkills = new[] { "prompt" }
+        })) { }
+
+        provider.SeenSystemPrompts.Should().ContainSingle(s =>
+            s.Contains("base prompt", StringComparison.Ordinal)
+            && s.Contains("Active skills: prompt", StringComparison.Ordinal)
+            && s.Contains("Always use examples before abstractions.", StringComparison.Ordinal));
+    }
+
     private sealed class EchoSkill : ISkill
     {
         public string Id => "echo";
@@ -72,6 +107,19 @@ public class ReActEngineTests
             });
         public ValueTask<SkillInvocationResult> InvokeAsync(string toolName, string args, SkillInvocationContext ctx, CancellationToken ct = default)
             => ValueTask.FromResult(SkillInvocationResult.Ok($"{{\"echo\":{args}}}", "echoed"));
+    }
+
+    private sealed class PromptSkill : ISkill
+    {
+        public string Id => "prompt";
+        public string Name => "Prompt";
+        public string Description => "Prompt-only skill";
+        public IReadOnlyList<string> Tags => new[] { "prompt" };
+        public string? SystemPromptFragment => "Always use examples before abstractions.";
+        public ValueTask<IReadOnlyList<ToolDefinition>> GetToolsAsync(CancellationToken ct = default)
+            => ValueTask.FromResult<IReadOnlyList<ToolDefinition>>(Array.Empty<ToolDefinition>());
+        public ValueTask<SkillInvocationResult> InvokeAsync(string toolName, string args, SkillInvocationContext ctx, CancellationToken ct = default)
+            => ValueTask.FromResult(SkillInvocationResult.Ok("{}"));
     }
 
     private sealed class SimpleDispatcher : IToolDispatcher
@@ -93,9 +141,12 @@ public class ReActEngineTests
         public string ProviderId => "scripted";
         public string DefaultModel => "fake";
         public LlmCapabilities Capabilities => LlmCapabilities.Streaming | LlmCapabilities.Tools;
+        public List<string> SeenSystemPrompts { get; } = new();
         public Task<ChatResponse> CompleteAsync(ChatRequest r, CancellationToken ct = default) => throw new NotImplementedException();
         public async IAsyncEnumerable<StreamingChunk> StreamAsync(ChatRequest r, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
+            var system = r.Messages.FirstOrDefault(m => m.Role == ChatRole.System)?.AsPlainText();
+            if (system is not null) SeenSystemPrompts.Add(system);
             var script = _turns.Dequeue();
             foreach (var c in script) { await Task.Yield(); yield return c; }
         }

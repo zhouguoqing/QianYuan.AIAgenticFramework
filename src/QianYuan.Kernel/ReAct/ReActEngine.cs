@@ -81,6 +81,7 @@ public sealed class ReActEngine
 
             // Refresh tool list from active skills each iteration so progressive expansion is picked up.
             var tools = await _skills.CollectToolsAsync(activeSkills, ct).ConfigureAwait(false);
+            var skillPromptFragments = await CollectSystemPromptFragmentsAsync(activeSkills, ct).ConfigureAwait(false);
             toolNameToSkillId.Clear();
             foreach (var t in tools)
                 if (t.SkillId is not null) toolNameToSkillId[t.Name] = t.SkillId;
@@ -104,7 +105,7 @@ public sealed class ReActEngine
 
             var chatReq = new ChatRequest
             {
-                Messages = BuildMessagesWithSystem(workingMessages, request.SystemPrompt, activeSkills),
+                Messages = BuildMessagesWithSystem(workingMessages, request.SystemPrompt, activeSkills, skillPromptFragments),
                 Tools = allTools.Count == 0 ? null : allTools,
                 Options = new GenerationOptions
                 {
@@ -282,13 +283,21 @@ public sealed class ReActEngine
     private static IReadOnlyList<ChatMessage> BuildMessagesWithSystem(
         IReadOnlyList<ChatMessage> conversation,
         string? systemPrompt,
-        IReadOnlyCollection<string> activeSkills)
+        IReadOnlyCollection<string> activeSkills,
+        IReadOnlyList<string> skillPromptFragments)
     {
         var combined = systemPrompt;
         if (activeSkills.Count > 0)
         {
             var skillList = string.Join(", ", activeSkills);
             combined = (combined is null ? "" : combined + "\n\n") + $"Active skills: {skillList}";
+        }
+
+        if (skillPromptFragments.Count > 0)
+        {
+            combined = (combined is null ? "" : combined + "\n\n")
+                + "Active skill instructions:\n\n"
+                + string.Join("\n\n---\n\n", skillPromptFragments);
         }
 
         if (string.IsNullOrWhiteSpace(combined)) return conversation;
@@ -303,6 +312,27 @@ public sealed class ReActEngine
         }
 
         return new[] { ChatMessage.System(combined) }.Concat(conversation).ToArray();
+    }
+
+    private async ValueTask<IReadOnlyList<string>> CollectSystemPromptFragmentsAsync(
+        IEnumerable<string> activeSkillIds,
+        CancellationToken ct)
+    {
+        var fragments = new List<string>();
+        foreach (var id in activeSkillIds)
+        {
+            try
+            {
+                var skill = await _skills.GetAsync(id, ct).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(skill.SystemPromptFragment))
+                    fragments.Add(skill.SystemPromptFragment!);
+            }
+            catch (SkillNotFoundException)
+            {
+                // Preloaded skill ids may be stale; CollectToolsAsync already treats unknown ids as absent.
+            }
+        }
+        return fragments;
     }
 
     private static string BuildIntent(IReadOnlyList<ChatMessage> messages)
