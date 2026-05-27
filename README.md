@@ -219,10 +219,62 @@ ToolCallEnd / ToolObservation / Usage / End / Error / Warning)，
 - `tavily` / `bing` / `brave`：填入相应平台的 `ApiKey` 即可。
 - 任何 Provider 的 ApiKey 为空时，框架会自动回退到 DuckDuckGo。
 
-## 从目录加载 Markdown Skill
+## Skill 文件体系与扩展注册
+
+QianYuan 支持三类 Skill 来源：代码实现的 `ISkill`、目录中的 Markdown Skill、以及外部 MCP Server 暴露的工具。
+所有来源最终都会进入 `ISkillManager`，以统一的 manifest 参与渐进式选择；当某个 Skill 被选中时，它的工具会进入 LLM tools，
+它的 `SystemPromptFragment` 也会注入当前轮 system prompt。
+
+### Markdown Skill 文件体系
 
 可以把 Claude/Copilot/Cursor 等常见的 `Skill.md` / `SKILL.md` 目录挂载到 QianYuan。框架会读取 YAML frontmatter 中的
 `name`、`description`、`tags`、`id` 等字段，注册成渐进式 Skill；当该 Skill 被选中时，Markdown 正文会注入系统提示。
+
+目录约定：
+
+- 每个 Skill 一个独立目录，目录内放 `SKILL.md` 或 `Skill.md`。
+- `Recursive = true` 时会递归扫描子目录，适合挂载已有的 agent skill 仓库。
+- `id` 可在 frontmatter 显式声明；未声明时会用 `IdPrefix + 相对目录` 生成稳定 ID。
+- 同一挂载目录内 ID 重复时，后续重复项会被跳过并记录 warning。
+- Markdown Skill 是提示型 Skill，`ApproximateToolCount = 0`，不直接暴露工具调用。
+
+支持的 frontmatter 字段：
+
+| 字段 | 作用 | 备注 |
+|------|------|------|
+| `id` | Skill 唯一标识 | 可选；会规范化为小写点分 ID |
+| `name` / `title` | Skill 展示名称 | 没有时回退到目录名 |
+| `description` / `summary` | 用于渐进式选择的描述 | 没有时回退到正文第一行 |
+| `tags` / `keywords` / `categories` | 检索标签 | 支持 `[a, b]` 或 YAML list |
+
+示例文件结构：
+
+```text
+skills/
+  code-review/
+    SKILL.md
+  pdf/
+    Skill.md
+```
+
+示例 `SKILL.md`：
+
+```markdown
+---
+id: sample.code-review
+name: code-review
+description: Review code for bugs, regressions, and missing tests
+tags: [review, testing]
+---
+
+# Code Review
+
+Prioritize correctness issues before style comments.
+```
+
+### 动态加载目录
+
+在 `QianYuan.SkillDirectories` 中声明要挂载的 Skill 目录：
 
 ```json
 {
@@ -245,16 +297,6 @@ ToolCallEnd / ToolObservation / Usage / End / Error / Warning)，
 }
 ```
 
-支持的典型结构：
-
-```text
-skills/
-  code-review/
-    SKILL.md
-  pdf/
-    Skill.md
-```
-
 仓库内置了一个可直接动态加载的示例目录：
 
 ```text
@@ -268,19 +310,104 @@ samples/skills/
 
 默认 `appsettings.json` 已启用 `./samples/skills`。启动 API 后可通过 `GET /api/skills` 查看这些示例 Skill 是否注册成功。
 
-示例 `SKILL.md`：
+API 启动时会执行：
 
-```markdown
----
-name: code-review
-description: Review code for bugs, regressions, and missing tests
-tags: [review, testing]
----
-
-# Code Review
-
-Prioritize correctness issues before style comments.
+```csharp
+app.Services.RegisterMarkdownSkillsFromDirectories(qy.SkillDirectories.Select(d => new MarkdownSkillDirectoryOptions
+{
+  Path = d.Path,
+  Recursive = d.Recursive,
+  Enabled = d.Enabled,
+  IdPrefix = d.IdPrefix,
+}));
 ```
+
+### 代码 Skill 注册
+
+需要真实工具能力时，实现 `ISkill`，提供 manifest 属性、工具定义和调用逻辑：
+
+```csharp
+public sealed class MySkill : ISkill
+{
+  public string Id => "my.skill";
+  public string Name => "My Skill";
+  public string Description => "Does one focused job.";
+  public IReadOnlyList<string> Tags => ["custom"];
+  public string? SystemPromptFragment => "Use this skill only when the task matches its description.";
+
+  public ValueTask<IReadOnlyList<ToolDefinition>> GetToolsAsync(CancellationToken ct = default)
+    => ValueTask.FromResult<IReadOnlyList<ToolDefinition>>([
+      new ToolDefinition(
+        "my_tool",
+        "Run my custom operation.",
+        "{\"type\":\"object\",\"properties\":{}}")
+    ]);
+
+  public ValueTask<SkillInvocationResult> InvokeAsync(
+    string toolName,
+    string argumentsJson,
+    SkillInvocationContext context,
+    CancellationToken ct = default)
+    => ValueTask.FromResult(SkillInvocationResult.Ok("{\"ok\":true}"));
+}
+```
+
+注册方式有两种。
+
+通过 DI 注册，适合普通应用启动：
+
+```csharp
+builder.Services.AddSingleton<ISkill, MySkill>();
+// app.Build() 后统一挂载到 SkillManager
+app.Services.RegisterSkillsFromServices();
+```
+
+直接注册到 `ISkillManager`，适合运行期管理、插件发现或测试：
+
+```csharp
+var manager = app.Services.GetRequiredService<ISkillManager>();
+manager.Register(new MySkill());
+```
+
+如果 Skill 初始化成本较高，也可以只注册轻量 manifest + factory，首次命中时再物化：
+
+```csharp
+manager.Register(
+  new SkillManifest(
+    "my.lazy-skill",
+    "Lazy Skill",
+    "Loads resources only when selected.",
+    ["custom", "lazy"],
+    ApproximateToolCount: 1,
+    RequiresNetwork: false,
+    RequiresFilesystem: false),
+  sp => new MySkill());
+```
+
+### MCP Skill 注册
+
+外部 MCP Server 可以作为 Skill 挂载。配置 stdio server 后，启动时调用 `MountMcpSkills()`，每个 MCP client 会被适配成一个 `McpSkill`：
+
+```csharp
+builder.Services.AddMcpStdioServer(new McpStdioServerConfig
+{
+  ServerId = "fs",
+  Command = "npx",
+  Arguments = ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+});
+
+app.Services.MountMcpSkills();
+```
+
+### 注册生命周期
+
+启动流程里，Skill 注册顺序是：
+
+1. `RegisterSkillsFromServices()`：挂载内置 Skill 和通过 DI 注册的自定义 `ISkill`。
+2. `RegisterMarkdownSkillsFromDirectories(...)`：按配置目录动态加载 `SKILL.md` / `Skill.md`。
+3. `MountMcpSkills()`：把外部 MCP Server 工具挂载为 Skill。
+
+注册完成后，`GET /api/skills` 可查看 catalog；ReAct 每轮会调用 `SelectRelevantAsync(intent, topK)` 选择当前最相关的 Skill。
 
 这类 Markdown Skill 是“提示型技能”，不会执行外部命令或暴露工具调用；需要真实工具能力时仍建议实现 `ISkill` 或通过 MCP 挂载。
 
