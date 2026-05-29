@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ChunkDto, ImagePart, StreamRequest } from '../types/api'
-import { streamChat } from '../services/api'
+import type { ChunkDto, ComposerMode, ImagePart, StreamRequest } from '../types/api'
+import { generateImage, streamChat } from '../services/api'
 import type { DisplayMessage } from '../components/ChatMessageView'
 
 interface UseChatOptions {
@@ -26,12 +26,17 @@ export function useChat(opts: UseChatOptions) {
 
   const abort = useCallback(() => { abortRef.current?.abort(); abortRef.current = null; setBusy(false) }, [])
 
-  const send = useCallback(async (text: string, images: ImagePart[]) => {
+  const send = useCallback(async (text: string, images: ImagePart[], mode: ComposerMode = 'chat') => {
     const userMsg: DisplayMessage = {
-      id: cryptoId(), kind: 'user', text,
+      id: cryptoId(), kind: 'user', text: mode === 'chat' ? text : `${mode === 'text-to-image' ? '文生图' : '图生图'}：${text}`,
       imageUrls: images.map(i => i.url ?? '').filter(Boolean),
     }
     setMessages(prev => [...prev, userMsg])
+
+    if (mode === 'text-to-image' || mode === 'image-to-image') {
+      await sendImageGeneration(text, images, mode)
+      return
+    }
 
     const req: StreamRequest = {
       agentId: opts.agentId ?? undefined,
@@ -62,6 +67,42 @@ export function useChat(opts: UseChatOptions) {
       setBusy(false)
       abortRef.current = null
       setMessages(prev => prev.map(m => m.streaming ? { ...m, streaming: false } : m))
+    }
+
+    async function sendImageGeneration(prompt: string, inputImages: ImagePart[], imageMode: 'text-to-image' | 'image-to-image') {
+      const ctrl = new AbortController()
+      abortRef.current = ctrl
+      setBusy(true)
+      const pendingId = cryptoId()
+      setMessages(prev => [...prev, { id: pendingId, kind: 'assistant', text: '正在生成图片...', streaming: true }])
+
+      try {
+        const result = await generateImage({
+          mode: imageMode,
+          prompt,
+          images: imageMode === 'image-to-image' ? inputImages : undefined,
+          provider: opts.provider ?? undefined,
+        }, ctrl.signal)
+        const imageUrl = result.url ?? (result.base64 ? `data:${result.mime || 'image/png'};base64,${result.base64}` : undefined)
+        setMessages(prev => prev.map(m => m.id === pendingId ? {
+          ...m,
+          text: result.revisedPrompt ? `生成完成\n\n${result.revisedPrompt}` : '生成完成',
+          imageUrls: imageUrl ? [imageUrl] : undefined,
+          streaming: false,
+        } : m))
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          setMessages(prev => prev.map(m => m.id === pendingId ? {
+            ...m,
+            kind: 'error',
+            text: String(err?.message ?? err),
+            streaming: false,
+          } : m))
+        }
+      } finally {
+        setBusy(false)
+        abortRef.current = null
+      }
     }
 
     function applyChunk(c: ChunkDto) {

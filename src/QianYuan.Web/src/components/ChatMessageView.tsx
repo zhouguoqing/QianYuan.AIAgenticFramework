@@ -1,4 +1,5 @@
-import { renderMarkdown } from '../services/markdown'
+import { useEffect } from 'react'
+import { renderMarkdown, renderUmlDiagrams } from '../services/markdown'
 
 export type DisplayKind = 'user' | 'assistant' | 'tool' | 'thinking' | 'error' | 'warning' | 'observation'
 
@@ -12,6 +13,8 @@ export interface DisplayMessage {
 }
 
 export function ChatMessageView({ msg }: { msg: DisplayMessage }) {
+  useEffect(() => { renderUmlDiagrams() }, [msg.text, msg.streaming])
+
   const label =
     msg.kind === 'user' ? '你'
     : msg.kind === 'assistant' ? '乾元'
@@ -32,7 +35,7 @@ export function ChatMessageView({ msg }: { msg: DisplayMessage }) {
     <div className={`msg ${cls}`}>
       <div className="who">{label}</div>
       {msg.imageUrls && msg.imageUrls.length > 0 && (
-        <div className="composer images">
+        <div className="message-images">
           {msg.imageUrls.map((u, i) => <img key={i} src={u} alt="attached" />)}
         </div>
       )}

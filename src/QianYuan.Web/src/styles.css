@@ -142,6 +142,9 @@ body {
 .msg .body pre code { background: transparent; padding: 0; }
 
 .composer { padding: 12px; background: var(--bg-elev); border-top: 1px solid var(--border); }
+.mode-tabs { display: inline-flex; gap: 4px; margin-bottom: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+.mode-tabs button { background: transparent; color: var(--text-dim); border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+.mode-tabs button.active { background: var(--accent); color: #0a0f1c; font-weight: 600; }
 .composer-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; }
 .composer textarea {
   background: var(--bg-card); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
@@ -156,6 +159,10 @@ body {
 .composer .send:disabled { opacity: 0.5; cursor: not-allowed; }
 .composer .images { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .composer .images img { height: 60px; border-radius: 6px; border: 1px solid var(--border); }
+.message-images { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+.message-images img { max-width: min(520px, 100%); max-height: 520px; border-radius: 8px; border: 1px solid var(--border); background: #0b0d12; object-fit: contain; }
+.uml-diagram { background: #0b0d12; padding: 12px; border-radius: 6px; overflow-x: auto; }
+.uml-fallback { background: #0b0d12; padding: 12px; border-radius: 6px; overflow-x: auto; border: 1px dashed var(--border); }
 
 .empty { padding: 40px; color: var(--text-dim); text-align: center; }
 .spinner { display: inline-block; width: 8px; height: 8px; background: var(--accent); border-radius: 50%; animation: pulse 1.2s infinite; }

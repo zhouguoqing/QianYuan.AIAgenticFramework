@@ -1,0 +1,54 @@
+<h2>图片生成入口放在哪里？</h2>
+<p class="subtitle">当前 WebUI 已有聊天、模型选择、图片粘贴和 Markdown 渲染；文生图/图生图可以轻量融入，也可以做成更像创作工作台的面板。</p>
+
+<div class="cards">
+  <div class="card" data-choice="composer-mode-tabs" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup" style="margin:0">
+        <div class="mockup-header">方案 A：聊天输入区增加模式切换</div>
+        <div class="mockup-body">
+          <div class="mock-nav">QianYuan · 乾元 ｜ Agent / Provider / GPT-Image-2</div>
+          <div style="display:grid;grid-template-columns:180px 1fr;gap:12px;margin-top:12px">
+            <div class="mock-sidebar">会话<br>技能<br>模型</div>
+            <div class="mock-content">
+              <div class="placeholder" style="height:86px">聊天消息、Markdown、UML 图展示</div>
+              <div style="display:flex;gap:6px;margin:10px 0">
+                <button class="mock-button">聊天</button>
+                <button class="mock-button">文生图</button>
+                <button class="mock-button">图生图</button>
+              </div>
+              <input class="mock-input" placeholder="描述要生成的图片...">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>推荐：在现有 Composer 中加模式 Tabs</h3>
+      <p>改动小，保留当前聊天流；上传图片时可切到图生图，生成结果以图片卡片回到消息区。</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="image-workbench" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup" style="margin:0">
+        <div class="mockup-header">方案 B：独立图片工作台</div>
+        <div class="mockup-body">
+          <div class="mock-nav">顶部：Chat / Image / Skills</div>
+          <div style="display:grid;grid-template-columns:1fr 240px;gap:12px;margin-top:12px">
+            <div class="mock-content">
+              <div class="placeholder" style="height:130px">图片画廊、批量结果、历史版本</div>
+            </div>
+            <div class="mock-sidebar">提示词<br>参考图<br>尺寸<br>质量<br>生成</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>独立 Image 工作台</h3>
+      <p>更适合复杂参数和图片历史，但要新增页面级导航、状态管理和更多后端接口。</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle">请点击一个方案，或直接在对话里告诉我你的偏好。</p>

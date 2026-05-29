@@ -30,6 +30,7 @@ public sealed class OpenAIProviderOptions
     public string BaseUrl { get; set; } = "https://api.openai.com/v1";
     public string ApiKey { get; set; } = "";
     public string DefaultModel { get; set; } = "gpt-4o";
+    public string? ImageModel { get; set; }
     public bool SupportsVision { get; set; } = true;
     /// <summary>
     /// Set false for endpoints that reject non-default temperature / top_p (e.g. GPT-5.5, o-series).

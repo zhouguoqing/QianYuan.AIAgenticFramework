@@ -19,6 +19,8 @@ export interface ChunkDto {
 
 export interface ImagePart { url?: string; base64?: string; mime?: string }
 
+export type ComposerMode = 'chat' | 'text-to-image' | 'image-to-image'
+
 export interface StreamRequest {
   agentId?: string
   sessionId?: string
@@ -29,6 +31,24 @@ export interface StreamRequest {
   model?: string
   skills?: string[]
   maxIterations?: number
+}
+
+export interface ImageGenerationRequest {
+  mode: 'text-to-image' | 'image-to-image'
+  prompt: string
+  images?: ImagePart[]
+  provider?: string
+  model?: string
+  size?: string
+}
+
+export interface ImageGenerationResponse {
+  provider: string
+  model: string
+  url?: string | null
+  base64?: string | null
+  mime: string
+  revisedPrompt?: string | null
 }
 
 export interface AgentDto { id: string; name: string; description: string; tags: string[] }

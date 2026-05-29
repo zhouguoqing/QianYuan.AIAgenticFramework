@@ -1,5 +1,5 @@
 import type {
-  ChunkDto, StreamRequest,
+  ChunkDto, StreamRequest, ImageGenerationRequest, ImageGenerationResponse,
   AgentDto, SkillManifestDto, SkillToolsResponse, McpStdioRegistrationRequest,
   ProvidersResponse, SessionSummaryDto
 } from '../types/api'
@@ -51,6 +51,20 @@ export async function listSessions(): Promise<SessionSummaryDto[]> {
 }
 export async function deleteSession(id: string) {
   await fetch(`${API}/sessions/${id}`, { method: 'DELETE' })
+}
+
+export async function generateImage(req: ImageGenerationRequest, signal: AbortSignal): Promise<ImageGenerationResponse> {
+  const r = await fetch(`${API}/images/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+    signal,
+  })
+  if (!r.ok) {
+    const text = await r.text()
+    throw new Error(text || `image HTTP ${r.status}`)
+  }
+  return r.json()
 }
 
 /**
