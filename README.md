@@ -301,6 +301,12 @@ Prioritize correctness issues before style comments.
   "QianYuan": {
     "SkillDirectories": [
       {
+        "Path": "./.agents/skills",
+        "Recursive": true,
+        "Enabled": true,
+        "IdPrefix": "agent"
+      },
+      {
         "Path": "./samples/skills",
         "Recursive": true,
         "Enabled": true,
@@ -317,7 +323,37 @@ Prioritize correctness issues before style comments.
 }
 ```
 
-仓库内置了一个可直接动态加载的示例目录：
+仓库内置了一个从 [skills.sh](https://skills.sh/) 下载的项目级 Skill 目录，以及一个可直接动态加载的示例目录：
+
+```text
+.agents/skills/
+  brainstorming/SKILL.md
+  brainstorm/SKILL.md
+  find-skills/SKILL.md
+  pdf/SKILL.md
+  skill-creator/SKILL.md
+  summarize/SKILL.md
+  using-superpowers/SKILL.md
+```
+
+这些技能通过官方 Skills CLI 安装，并由 `skills-lock.json` 记录来源与内容哈希；可用以下命令复原或更新：
+
+```bash
+npx skills experimental_install
+npx skills update -p -y
+```
+
+当前内置下载来源包括：
+
+| Skill | 来源 | 说明 |
+|-------|------|------|
+| `using-superpowers` / `brainstorming` | `archieindian/openclaw-superpowers` | Superpowers 工作流与前置构思流程 |
+| `brainstorm` | `buiducnhat/agent-skills` | 轻量构思与方案收敛流程 |
+| `find-skills` | `vercel-labs/skills` | 从 skills.sh 发现与安装技能 |
+| `skill-creator` / `pdf` | `anthropics/skills` | 创建/优化 Skill，以及 PDF 读取与处理 |
+| `summarize` | `sjunepark/custom-skills` | URL、本地文件、媒体等内容摘要 |
+
+示例目录：
 
 ```text
 samples/skills/
@@ -328,7 +364,7 @@ samples/skills/
   requirements-analysis/SKILL.md
 ```
 
-默认 `appsettings.json` 已启用 `./samples/skills`。启动 API 后可通过 `GET /api/skills` 查看这些示例 Skill 是否注册成功。
+默认 `appsettings.json` 已启用 `./.agents/skills` 和 `./samples/skills`。启动 API 后可通过 `GET /api/skills` 查看这些 Skill 是否注册成功。
 
 API 启动时会执行：
 

@@ -58,6 +58,40 @@ public class SkillManagerTests
     }
 
     [Fact]
+    public async Task SelectRelevantAsync_selects_prompt_workflow_skills_for_chinese_planning_intent()
+    {
+        var mgr = new SkillManager(EmptyProvider.Instance, NullLogger<SkillManager>.Instance);
+        RegisterDownloadedPromptSkills(mgr);
+
+        var picked = await mgr.SelectRelevantAsync("请评估 React 推理计划拆解，并改进代码", topK: 3);
+
+        picked.Select(m => m.Id).Should().Contain(new[]
+        {
+            "agent.using.superpowers",
+            "agent.brainstorming",
+            "agent.brainstorm",
+        });
+    }
+
+    [Fact]
+    public async Task SelectRelevantAsync_selects_domain_prompt_skills_for_chinese_intents()
+    {
+        var mgr = new SkillManager(EmptyProvider.Instance, NullLogger<SkillManager>.Instance);
+        RegisterDownloadedPromptSkills(mgr);
+
+        var picked = await mgr.SelectRelevantAsync("从 skills.sh 查找并安装 PDF 阅读、总结和创建技能", topK: 5);
+
+        picked.Select(m => m.Id).Should().Contain(new[]
+        {
+            "agent.using.superpowers",
+            "agent.find.skills",
+            "agent.pdf",
+            "agent.skill.creator",
+            "agent.summarize",
+        });
+    }
+
+    [Fact]
     public async Task SelectRelevantAsync_falls_back_to_all_when_no_match()
     {
         var mgr = new SkillManager(EmptyProvider.Instance, NullLogger<SkillManager>.Instance);
@@ -99,6 +133,17 @@ public class SkillManagerTests
             => ValueTask.FromResult<IReadOnlyList<ToolDefinition>>(_tools);
         public ValueTask<SkillInvocationResult> InvokeAsync(string toolName, string args, SkillInvocationContext ctx, CancellationToken ct = default)
             => ValueTask.FromResult(SkillInvocationResult.Ok("{}"));
+    }
+
+    private static void RegisterDownloadedPromptSkills(SkillManager mgr)
+    {
+        mgr.Register(new FakeSkill("agent.brainstorm", "brainstorm", "Collaborative discovery and design framing for ambiguous or high-risk work", Array.Empty<string>()));
+        mgr.Register(new FakeSkill("agent.brainstorming", "brainstorming", "Structured ideation before any implementation", Array.Empty<string>()));
+        mgr.Register(new FakeSkill("agent.find.skills", "find-skills", "Helps users discover and install agent skills", Array.Empty<string>()));
+        mgr.Register(new FakeSkill("agent.pdf", "pdf", "Read and process PDF files", Array.Empty<string>()));
+        mgr.Register(new FakeSkill("agent.skill.creator", "skill-creator", "Create high-quality agent skills", Array.Empty<string>()));
+        mgr.Register(new FakeSkill("agent.summarize", "summarize", "Summarize or extract content", Array.Empty<string>()));
+        mgr.Register(new FakeSkill("agent.using.superpowers", "using-superpowers", "Bootstrap skill for finding and invoking skills", Array.Empty<string>()));
     }
 
     private sealed class EmptyProvider : IServiceProvider

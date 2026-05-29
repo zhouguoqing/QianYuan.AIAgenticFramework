@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using QianYuan.Core.Abstractions;
 using QianYuan.Core.Models;
+using System.Globalization;
 
 namespace QianYuan.Kernel.Skills;
 
@@ -100,11 +101,12 @@ public sealed class SkillManager : ISkillManager
     public ValueTask<IReadOnlyList<SkillManifest>> SelectRelevantAsync(string intent, int topK = 8, CancellationToken ct = default)
     {
         var tokens = Tokenize(intent);
+        var normalizedIntent = NormalizeKey(intent);
         SkillManifest[] all;
         lock (_gate) all = _entries.Values.Where(e => e.Enabled).Select(e => e.Manifest).ToArray();
 
         var ranked = all
-            .Select(m => (m, score: Score(m, tokens)))
+            .Select(m => (m, score: Score(m, tokens, normalizedIntent)))
             .Where(t => t.score > 0)
             .OrderByDescending(t => t.score)
             .Take(topK)
@@ -172,12 +174,74 @@ public sealed class SkillManager : ISkillManager
         return set;
     }
 
-    private static int Score(SkillManifest m, HashSet<string> tokens)
+    private static int Score(SkillManifest m, HashSet<string> tokens, string normalizedIntent)
     {
         var s = 0;
         foreach (var tag in m.Tags) if (tokens.Contains(tag)) s += 3;
+        foreach (var word in Tokenize(m.Id)) if (tokens.Contains(word)) s += 3;
         foreach (var word in Tokenize(m.Name)) if (tokens.Contains(word)) s += 2;
         foreach (var word in Tokenize(m.Description)) if (tokens.Contains(word)) s += 1;
+
+        s += ScoreWellKnownPromptSkill(m, normalizedIntent);
+
         return s;
+    }
+
+    private static int ScoreWellKnownPromptSkill(SkillManifest manifest, string normalizedIntent)
+    {
+        if (string.IsNullOrWhiteSpace(normalizedIntent)) return 0;
+
+        var score = 0;
+        if (IsSkill(manifest, "using-superpowers")) score += 1;
+
+        if (HasAny(normalizedIntent, "plan", "planning", "decompose", "decomposition", "breakdown", "reasoning", "react", "design", "requirement", "evaluate", "implement", "计划", "规划", "拆解", "推理", "设计", "需求", "评估", "改进", "实现"))
+        {
+            if (IsSkill(manifest, "brainstorm", "brainstorming")) score += 16;
+        }
+
+        if (HasAny(normalizedIntent, "skill", "skills", "findskill", "findskills", "installskill", "技能", "安装", "下载", "引用", "查找", "寻找", "扩展能力"))
+        {
+            if (IsSkill(manifest, "find-skills")) score += 16;
+        }
+
+        if (HasAny(normalizedIntent, "createskill", "skillcreator", "skillmd", "newskill", "创建技能", "新建技能", "编写技能", "制作技能"))
+        {
+            if (IsSkill(manifest, "skill-creator")) score += 16;
+        }
+
+        if (HasAny(normalizedIntent, "pdf", "阅读pdf", "pdf阅读"))
+        {
+            if (IsSkill(manifest, "pdf")) score += 16;
+        }
+
+        if (HasAny(normalizedIntent, "summary", "summarize", "summarise", "recap", "总结", "摘要", "提炼", "归纳"))
+        {
+            if (IsSkill(manifest, "summarize")) score += 16;
+        }
+
+        return score;
+    }
+
+    private static bool IsSkill(SkillManifest manifest, params string[] names)
+    {
+        var id = NormalizeKey(manifest.Id);
+        var name = NormalizeKey(manifest.Name);
+        foreach (var candidate in names.Select(NormalizeKey))
+        {
+            if (id.EndsWith(candidate, StringComparison.OrdinalIgnoreCase) || name == candidate)
+                return true;
+        }
+        return false;
+    }
+
+    private static bool HasAny(string normalizedText, params string[] terms)
+        => terms.Any(term => normalizedText.Contains(NormalizeKey(term), StringComparison.OrdinalIgnoreCase));
+
+    private static string NormalizeKey(string text)
+    {
+        var chars = text.ToLower(CultureInfo.InvariantCulture)
+            .Where(char.IsLetterOrDigit)
+            .ToArray();
+        return new string(chars);
     }
 }

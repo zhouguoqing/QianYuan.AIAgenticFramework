@@ -66,6 +66,25 @@ Find behavioral regressions before style issues.
         skills.Should().OnlyContain(s => !string.IsNullOrWhiteSpace(s.SystemPromptFragment));
     }
 
+    [Fact]
+    public void LoadFromDirectory_loads_project_agent_skills_from_skills_sh()
+    {
+        var agentSkillsPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".agents", "skills"));
+
+        var skills = MarkdownSkillLoader.LoadFromDirectory(agentSkillsPath, recursive: true, idPrefix: "agent");
+
+        skills.Select(s => s.Id).Should().Contain([
+            "agent.brainstorm",
+            "agent.brainstorming",
+            "agent.find.skills",
+            "agent.pdf",
+            "agent.skill.creator",
+            "agent.summarize",
+            "agent.using.superpowers",
+        ]);
+        skills.Should().OnlyContain(s => !string.IsNullOrWhiteSpace(s.SystemPromptFragment));
+    }
+
     private sealed class TempDirectory : IDisposable
     {
         public TempDirectory()

@@ -95,6 +95,50 @@ public class ReActEngineTests
     }
 
     [Fact]
+    public async Task Engine_progressively_selects_and_injects_prompt_skills_for_chinese_planning_intent()
+    {
+        var skills = new SkillManager(EmptyServices.Instance, NullLogger<SkillManager>.Instance);
+        skills.Register(new PromptSkill(
+            "agent.using.superpowers",
+            "using-superpowers",
+            "Bootstrap skill for finding and invoking skills",
+            "Review available skills before starting."));
+        skills.Register(new PromptSkill(
+            "agent.brainstorming",
+            "brainstorming",
+            "Structured ideation before any implementation",
+            "Brainstorm before implementation."));
+
+        var provider = new ScriptedProvider(new[]
+        {
+            new StreamingChunk[]
+            {
+                StreamingChunk.Start(),
+                StreamingChunk.OfText("done"),
+                StreamingChunk.End("stop"),
+            }
+        });
+
+        var engine = new ReActEngine(provider, skills, new AgentRegistry(), NullLogger<ReActEngine>.Instance,
+            new ReActEngineOptions { MaxIterations = 2, ProgressiveTopK = 2, ExposeAgentsAsTools = false });
+
+        await foreach (var _ in engine.RunAsync(new ReActRunRequest
+        {
+            InitialMessages = new[] { ChatMessage.User("请评估 React 推理计划拆解，并改进代码") },
+            SessionId = "s",
+            Services = EmptyServices.Instance,
+            Dispatcher = new SimpleDispatcher(skills),
+        })) { }
+
+        provider.SeenSystemPrompts.Should().ContainSingle(s =>
+            s.Contains("Active skills:", StringComparison.Ordinal)
+            && s.Contains("agent.using.superpowers", StringComparison.Ordinal)
+            && s.Contains("agent.brainstorming", StringComparison.Ordinal)
+            && s.Contains("Review available skills before starting.", StringComparison.Ordinal)
+            && s.Contains("Brainstorm before implementation.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Engine_request_max_iterations_overrides_default_options()
     {
         var skills = new SkillManager(EmptyServices.Instance, NullLogger<SkillManager>.Instance);
@@ -156,11 +200,25 @@ public class ReActEngineTests
 
     private sealed class PromptSkill : ISkill
     {
-        public string Id => "prompt";
-        public string Name => "Prompt";
-        public string Description => "Prompt-only skill";
+        private readonly string _fragment;
+
+        public PromptSkill(
+            string id = "prompt",
+            string name = "Prompt",
+            string description = "Prompt-only skill",
+            string fragment = "Always use examples before abstractions.")
+        {
+            Id = id;
+            Name = name;
+            Description = description;
+            _fragment = fragment;
+        }
+
+        public string Id { get; }
+        public string Name { get; }
+        public string Description { get; }
         public IReadOnlyList<string> Tags => new[] { "prompt" };
-        public string? SystemPromptFragment => "Always use examples before abstractions.";
+        public string? SystemPromptFragment => _fragment;
         public ValueTask<IReadOnlyList<ToolDefinition>> GetToolsAsync(CancellationToken ct = default)
             => ValueTask.FromResult<IReadOnlyList<ToolDefinition>>(Array.Empty<ToolDefinition>());
         public ValueTask<SkillInvocationResult> InvokeAsync(string toolName, string args, SkillInvocationContext ctx, CancellationToken ct = default)

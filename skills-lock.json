@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "brainstorm": {
+      "source": "buiducnhat/agent-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/cobrew/skills/brainstorm/SKILL.md",
+      "computedHash": "1a962c27c8014790ed098e31495950bf75f926759f114cbb9f4b4e2019827dde"
+    },
+    "brainstorming": {
+      "source": "archieindian/openclaw-superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/core/brainstorming/SKILL.md",
+      "computedHash": "8ee2735944d478770ed59b833a68b1f8cea35719de52bcdd933d09ddce5be626"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "9e1c8b3103f92fa8092568a44fe64858de7c5c9dc65ce4bea8f168080e889cfd"
+    },
+    "pdf": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pdf/SKILL.md",
+      "computedHash": "cfbc539377088ca7e44a813b30c306327385bbd973cd7a721e1743f60837dd62"
+    },
+    "skill-creator": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/skill-creator/SKILL.md",
+      "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
+    },
+    "summarize": {
+      "source": "sjunepark/custom-skills",
+      "sourceType": "github",
+      "skillPath": "skills/summarize/SKILL.md",
+      "computedHash": "19893c6bde90bc81f97aeed128077afe0d2823bc7e4b301ca1d17bfb71c5e981"
+    },
+    "using-superpowers": {
+      "source": "archieindian/openclaw-superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/core/using-superpowers/SKILL.md",
+      "computedHash": "dfd39a9fb7a1ed9980c8dca99a31011fffc7a28f40a7d5fca7e373307c70f548"
+    }
+  }
+}
