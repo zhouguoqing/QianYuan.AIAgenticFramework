@@ -54,7 +54,7 @@ public sealed class ReActEngine
         if (request.PreloadSkills is not null)
             foreach (var id in request.PreloadSkills) activeSkills.Add(id);
 
-        if (_opts.UseProgressiveSelection && activeSkills.Count == 0 && !string.IsNullOrWhiteSpace(lastUserText))
+        if (_opts.UseProgressiveSelection && !string.IsNullOrWhiteSpace(lastUserText))
         {
             var picked = await _skills.SelectRelevantAsync(lastUserText, _opts.ProgressiveTopK, ct).ConfigureAwait(false);
             foreach (var m in picked) activeSkills.Add(m.Id);

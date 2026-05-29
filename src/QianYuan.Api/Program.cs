@@ -136,11 +136,29 @@ builder.Services.AddReActAgent(new ReActAgentDefinition
     Name = "QianYuan",
     Description = "General-purpose ReAct agent with progressive skill loading.",
     SystemPrompt =
-        "你是 QianYuan（乾元）智能助手。遵循 ReAct 框架：先思考再行动，需要外部信息时调用工具，得到观察后继续推理。" +
+        "你是 QianYuan（乾元）智能助手。遵循 ReAct 框架：先思考再行动，需要外部信息时调用工具，得到观察后继续推理。\n\n" +
+        "关键技能使用指南：\n" +
+        "• 当用户提及【规划/设计/需求/拆解/推理/评估】等关键词时 → 调用 brainstorming 技能进行深度分析与设计\n" +
+        "• 当用户提及【查找技能/安装能力/扩展功能】等关键词时 → 调用 find-skills 技能查找合适的技能\n" +
+        "• 当用户提及【创建/新建/制作技能】等关键词时 → 调用 skill-creator 技能帮助创建\n" +
+        "• 当用户提及【总结/摘要/提炼】等关键词时 → 调用 summarize 技能\n" +
+        "• 当用户提及【PDF/阅读文档】等关键词时 → 调用 pdf 技能处理PDF\n\n" +
         "工具会根据用户意图渐进式加载——只暴露当前可能用到的技能。",
     PreferredProviderId = qy.DefaultProviderId,
     Temperature = 0.4f,
     MaxIterations = qy.DefaultAgentMaxIterations,
+    UseProgressiveSkillLoading = true,
+    ProgressiveTopK = 8,
+    PreloadSkills =
+    [
+        "skill.self.improving.agent",
+        "skill.summarize",
+        "skill.git.essentials",
+        "skill.weather.query",
+        "skill.api.gateway",
+        "skill.agent.browser.automation",
+        "skill.proactive.agent",
+    ],
     Tags = ["default"],
 });
 

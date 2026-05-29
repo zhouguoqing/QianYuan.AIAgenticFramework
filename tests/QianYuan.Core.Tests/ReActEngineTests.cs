@@ -139,6 +139,50 @@ public class ReActEngineTests
     }
 
     [Fact]
+    public async Task Engine_combines_preloaded_skills_with_progressive_selection()
+    {
+        var skills = new SkillManager(EmptyServices.Instance, NullLogger<SkillManager>.Instance);
+        skills.Register(new PromptSkill(
+            "skill.summarize",
+            "summarize",
+            "Summarize URLs and local files",
+            "Summarize content when requested."));
+        skills.Register(new PromptSkill(
+            "agent.brainstorming",
+            "brainstorming",
+            "Structured ideation before any implementation",
+            "Brainstorm before implementation."));
+
+        var provider = new ScriptedProvider(new[]
+        {
+            new StreamingChunk[]
+            {
+                StreamingChunk.Start(),
+                StreamingChunk.OfText("done"),
+                StreamingChunk.End("stop"),
+            }
+        });
+
+        var engine = new ReActEngine(provider, skills, new AgentRegistry(), NullLogger<ReActEngine>.Instance,
+            new ReActEngineOptions { MaxIterations = 2, ProgressiveTopK = 2, ExposeAgentsAsTools = false });
+
+        await foreach (var _ in engine.RunAsync(new ReActRunRequest
+        {
+            InitialMessages = new[] { ChatMessage.User("请先做方案设计和推理计划") },
+            SessionId = "s",
+            Services = EmptyServices.Instance,
+            Dispatcher = new SimpleDispatcher(skills),
+            PreloadSkills = new[] { "skill.summarize" },
+        })) { }
+
+        provider.SeenSystemPrompts.Should().ContainSingle(s =>
+            s.Contains("skill.summarize", StringComparison.Ordinal)
+            && s.Contains("agent.brainstorming", StringComparison.Ordinal)
+            && s.Contains("Summarize content when requested.", StringComparison.Ordinal)
+            && s.Contains("Brainstorm before implementation.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Engine_request_max_iterations_overrides_default_options()
     {
         var skills = new SkillManager(EmptyServices.Instance, NullLogger<SkillManager>.Instance);
