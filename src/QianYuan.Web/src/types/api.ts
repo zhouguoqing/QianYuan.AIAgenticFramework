@@ -78,3 +78,10 @@ export interface SessionSummaryDto {
   sessionId: string; title?: string | null; agentId?: string | null
   messageCount: number; createdAt: string; updatedAt: string
 }
+
+// Knowledge base types
+export interface KnowledgeDocument {
+  id: string; title: string; content: string; tags: string[]; createdAt: string;
+  sourceFile?: string | null; sourceSection?: string | null;
+}
+export interface KnowledgeSearchResult { matches: KnowledgeDocument[]; answer?: string | null }

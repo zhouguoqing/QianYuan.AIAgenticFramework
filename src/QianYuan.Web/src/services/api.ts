@@ -67,6 +67,40 @@ export async function generateImage(req: ImageGenerationRequest, signal: AbortSi
   return r.json()
 }
 
+// Knowledge base API
+export async function listKnowledge(): Promise<KnowledgeDocument[]> {
+  const r = await fetch(`${API}/knowledge`); return r.json()
+}
+export async function uploadKnowledge(req: { title?: string; content: string; tags?: string[] }) {
+  const r = await fetch(`${API}/knowledge/upload`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  });
+  if (!r.ok) throw new Error(await r.text())
+  return r.json()
+}
+export async function uploadKnowledgeFile(body: FormData) {
+  const r = await fetch(`${API}/knowledge/upload-file`, {
+    method: 'POST', body,
+  });
+  if (!r.ok) throw new Error(await r.text())
+  return r.json()
+}
+export async function searchKnowledge(q: string, topK = 5, answer = false, provider?: string): Promise<KnowledgeSearchResult> {
+  const params = new URLSearchParams({ q, topK: String(topK), answer: String(answer) })
+  if (provider) params.set('provider', provider)
+  const r = await fetch(`${API}/knowledge/search?${params.toString()}`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json()
+}
+export async function getKnowledge(id: string): Promise<KnowledgeDocument> {
+  const r = await fetch(`${API}/knowledge/${encodeURIComponent(id)}`)
+  if (!r.ok) throw new Error('not found')
+  return r.json()
+}
+export async function deleteKnowledge(id: string) {
+  await fetch(`${API}/knowledge/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
 /**
  * POST /api/chat/stream returns text/event-stream. We parse SSE frames as they arrive and yield
  * typed ChunkDto values. The caller controls cancellation via AbortSignal.

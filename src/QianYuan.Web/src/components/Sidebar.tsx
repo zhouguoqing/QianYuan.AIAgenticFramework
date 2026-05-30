@@ -6,6 +6,7 @@ import {
   listAgents, listProviders, listSkills, listSessions, deleteSession,
 } from '../services/api'
 import { SkillsManager } from './SkillsManager'
+import { KnowledgeManager } from './KnowledgeManager'
 
 interface Props {
   selectedAgent: string | null
@@ -28,6 +29,7 @@ export function Sidebar(p: Props) {
   const [skills, setSkills] = useState<SkillManifestDto[]>([])
   const [sessions, setSessions] = useState<SessionSummaryDto[]>([])
   const [showSkillsManager, setShowSkillsManager] = useState(false)
+  const [showKnowledgeManager, setShowKnowledgeManager] = useState(false)
 
   useEffect(() => {
     Promise.all([listAgents(), listProviders(), listSkills(), listSessions()])
@@ -122,6 +124,10 @@ export function Sidebar(p: Props) {
           <label className="field-label" style={{ flex: 1 }}>技能</label>
           <button className="ghost-btn" onClick={() => setShowSkillsManager(true)}>管理</button>
         </div>
++        <div style={{ marginTop: 8 }}>
++          <label className="field-label" style={{ flex: 1 }}>知识库</label>
++          <button className="ghost-btn" onClick={() => setShowKnowledgeManager(true)}>管理</button>
++        </div>
         <div className="skill-list">
           {skills.map(s => (
             <label key={s.id}
@@ -165,6 +171,9 @@ export function Sidebar(p: Props) {
 
       {showSkillsManager && (
         <SkillsManager onClose={() => { setShowSkillsManager(false); reloadSkills() }} />
+      )}
+      {showKnowledgeManager && (
+        <KnowledgeManager onClose={() => { setShowKnowledgeManager(false); }} />
       )}
     </aside>
   )

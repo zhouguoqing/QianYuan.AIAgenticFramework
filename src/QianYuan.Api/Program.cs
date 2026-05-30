@@ -177,7 +177,10 @@ if (qy.DingTalk is { Enabled: true } dt)
 // --- Provider model catalog (drives Web UI model selector) ---
 builder.Services.AddSingleton<ProviderModelCatalog>();
 
-// --- ASP.NET Core plumbing ---
+// --- Knowledge services ---
+builder.Services.AddSingleton<QianYuan.Api.Services.IKnowledgeDocumentParser, QianYuan.Api.Services.KnowledgeDocumentParser>();
+builder.Services.AddSingleton<QianYuan.Api.Services.IKnowledgeStore, QianYuan.Api.Services.VectorKnowledgeStore>();
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
