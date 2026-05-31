@@ -179,7 +179,19 @@ builder.Services.AddSingleton<ProviderModelCatalog>();
 
 // --- Knowledge services ---
 builder.Services.AddSingleton<QianYuan.Api.Services.IKnowledgeDocumentParser, QianYuan.Api.Services.KnowledgeDocumentParser>();
-builder.Services.AddSingleton<QianYuan.Api.Services.IKnowledgeStore, QianYuan.Api.Services.VectorKnowledgeStore>();
+var knowledgeStoreType = (qy.KnowledgeStore?.Provider ?? "inmemory").Trim().ToLowerInvariant();
+if (knowledgeStoreType is "postgres" or "pgvector" or "pg")
+{
+    builder.Services.AddSingleton<QianYuan.Api.Services.IKnowledgeStore>(sp =>
+        new QianYuan.Api.Services.PostgresKnowledgeStore(
+            qy.KnowledgeStore?.Postgres ?? new QianYuan.Api.Configuration.PostgresOptions(),
+            sp.GetRequiredService<ILlmProviderRegistry>(),
+            sp.GetRequiredService<ILogger<QianYuan.Api.Services.PostgresKnowledgeStore>>()));
+}
+else
+{
+    builder.Services.AddSingleton<QianYuan.Api.Services.IKnowledgeStore, QianYuan.Api.Services.VectorKnowledgeStore>();
+}
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

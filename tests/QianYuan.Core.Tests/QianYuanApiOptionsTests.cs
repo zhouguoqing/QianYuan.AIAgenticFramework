@@ -36,4 +36,24 @@ public class QianYuanApiOptionsTests
         options.Should().NotBeNull();
         options!.DefaultAgentMaxIterations.Should().Be(37);
     }
+
+    [Fact]
+    public void Configuration_can_bind_knowledge_store_settings()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["QianYuan:KnowledgeStore:Provider"] = "postgres",
+                ["QianYuan:KnowledgeStore:Postgres:ConnectionString"] = "Host=localhost;Database=qianyuan;Username=test;Password=test;",
+                ["QianYuan:KnowledgeStore:Postgres:TableName"] = "knowledge_documents",
+            })
+            .Build();
+
+        var options = configuration.GetSection("QianYuan").Get<QianYuanApiOptions>();
+
+        options.Should().NotBeNull();
+        options!.KnowledgeStore.Provider.Should().Be("postgres");
+        options.KnowledgeStore.Postgres.ConnectionString.Should().Be("Host=localhost;Database=qianyuan;Username=test;Password=test;");
+        options.KnowledgeStore.Postgres.TableName.Should().Be("knowledge_documents");
+    }
 }

@@ -23,5 +23,6 @@
     <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
     <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
+    <PackageReference Include="Npgsql" Version="7.0.0" />
   </ItemGroup>
 </Project>

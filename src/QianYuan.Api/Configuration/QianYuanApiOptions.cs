@@ -22,6 +22,19 @@ public sealed class QianYuanApiOptions
     public McpServerEntry[] McpServers { get; set; } = Array.Empty<McpServerEntry>();
     public DingTalkConfig? DingTalk { get; set; }
     public CorsConfig Cors { get; set; } = new();
+    public KnowledgeStoreOptions KnowledgeStore { get; set; } = new();
+}
+
+public sealed class KnowledgeStoreOptions
+{
+    public string Provider { get; set; } = "inmemory";
+    public PostgresOptions Postgres { get; set; } = new();
+}
+
+public sealed class PostgresOptions
+{
+    public string ConnectionString { get; set; } = string.Empty;
+    public string TableName { get; set; } = "knowledge_documents";
 }
 
 public sealed class OpenAIProviderOptions

@@ -13,7 +13,7 @@ public sealed class KnowledgeDocument
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [System.Text.Json.Serialization.JsonIgnore]
-    internal double[]? Vector { get; set; }
+    public double[]? Vector { get; set; }
 }
 
 public interface IKnowledgeStore
