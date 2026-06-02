@@ -124,10 +124,10 @@ export function Sidebar(p: Props) {
           <label className="field-label" style={{ flex: 1 }}>技能</label>
           <button className="ghost-btn" onClick={() => setShowSkillsManager(true)}>管理</button>
         </div>
-+        <div style={{ marginTop: 8 }}>
-+          <label className="field-label" style={{ flex: 1 }}>知识库</label>
-+          <button className="ghost-btn" onClick={() => setShowKnowledgeManager(true)}>管理</button>
-+        </div>
+        <div className="section-head knowledge-entry">
+          <label className="field-label" style={{ flex: 1 }}>知识库</label>
+          <button className="ghost-btn" onClick={() => setShowKnowledgeManager(true)}>管理</button>
+        </div>
         <div className="skill-list">
           {skills.map(s => (
             <label key={s.id}
@@ -173,7 +173,7 @@ export function Sidebar(p: Props) {
         <SkillsManager onClose={() => { setShowSkillsManager(false); reloadSkills() }} />
       )}
       {showKnowledgeManager && (
-        <KnowledgeManager onClose={() => { setShowKnowledgeManager(false); }} />
+        <KnowledgeManager provider={p.selectedProvider} onClose={() => { setShowKnowledgeManager(false); }} />
       )}
     </aside>
   )

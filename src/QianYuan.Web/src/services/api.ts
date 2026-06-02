@@ -1,7 +1,7 @@
 import type {
   ChunkDto, StreamRequest, ImageGenerationRequest, ImageGenerationResponse,
   AgentDto, SkillManifestDto, SkillToolsResponse, McpStdioRegistrationRequest,
-  ProvidersResponse, SessionSummaryDto
+  ProvidersResponse, SessionSummaryDto, KnowledgeDocument, KnowledgeSearchResult,
 } from '../types/api'
 
 const API = '/api'
@@ -69,7 +69,9 @@ export async function generateImage(req: ImageGenerationRequest, signal: AbortSi
 
 // Knowledge base API
 export async function listKnowledge(): Promise<KnowledgeDocument[]> {
-  const r = await fetch(`${API}/knowledge`); return r.json()
+  const r = await fetch(`${API}/knowledge`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json()
 }
 export async function uploadKnowledge(req: { title?: string; content: string; tags?: string[] }) {
   const r = await fetch(`${API}/knowledge/upload`, {
@@ -98,7 +100,8 @@ export async function getKnowledge(id: string): Promise<KnowledgeDocument> {
   return r.json()
 }
 export async function deleteKnowledge(id: string) {
-  await fetch(`${API}/knowledge/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  const r = await fetch(`${API}/knowledge/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(await r.text())
 }
 
 /**
