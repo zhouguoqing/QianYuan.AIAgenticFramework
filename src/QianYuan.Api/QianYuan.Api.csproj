@@ -14,6 +14,7 @@
     <ProjectReference Include="..\QianYuan.Skills.Builtin\QianYuan.Skills.Builtin.csproj" />
     <ProjectReference Include="..\QianYuan.Mcp\QianYuan.Mcp.csproj" />
     <ProjectReference Include="..\QianYuan.Integrations.DingTalk\QianYuan.Integrations.DingTalk.csproj" />
+    <ProjectReference Include="..\QianYuan.Data\QianYuan.Data.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />

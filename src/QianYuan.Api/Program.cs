@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.HttpOverrides;
 using QianYuan.Api.Configuration;
 using QianYuan.Api.Hubs;
+using QianYuan.Api.Services;
 using QianYuan.Core.Abstractions;
+using QianYuan.Data;
+using QianYuan.Data.Services;
 using QianYuan.Integrations.DingTalk;
 using QianYuan.Kernel;
 using QianYuan.Kernel.Agents;
@@ -19,6 +22,15 @@ using QianYuan.Skills.Builtin.Code;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<QianYuanApiOptions>(builder.Configuration.GetSection("QianYuan"));
 var qy = builder.Configuration.GetSection("QianYuan").Get<QianYuanApiOptions>() ?? new();
+
+// --- Database and encryption ---
+var dbConnectionString = builder.Configuration.GetConnectionString("QianYuanDb") 
+    ?? "DataSource=qianyuan.db";
+var encryptionKey = builder.Configuration["QianYuan:EncryptionKey"] 
+    ?? AesEncryptionService.GenerateEncryptionKey();
+builder.Services.AddQianYuanData(dbConnectionString, encryptionKey);
+builder.Services.AddScoped<IAgentManagementService, AgentManagementService>();
+builder.Services.AddScoped<IAgentExecutionService, AgentExecutionService>();
 
 // --- core kernel ---
 builder.Services.AddQianYuanKernel();
@@ -204,6 +216,9 @@ builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
 builder.Services.AddSingleton(sp => sp.CreateMcpServerCore("qianyuan"));
 
 var app = builder.Build();
+
+// Initialize database
+await app.Services.InitializeDatabaseAsync();
 
 // Mount skills and agents into the registries.
 app.Services.RegisterProvidersFromServices(qy.DefaultProviderId);

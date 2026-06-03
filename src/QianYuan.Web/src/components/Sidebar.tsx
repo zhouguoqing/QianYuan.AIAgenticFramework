@@ -9,6 +9,7 @@ import { SkillsManager } from './SkillsManager'
 import { KnowledgeManager } from './KnowledgeManager'
 
 interface Props {
+  onOpenAgentStore: () => void
   selectedAgent: string | null
   onAgentChange: (id: string) => void
   selectedProvider: string | null
@@ -81,6 +82,7 @@ export function Sidebar(p: Props) {
 
       <div className="sidebar-section">
         <button className="primary-btn" onClick={p.onNewSession}>+ 新建会话</button>
+        <button className="secondary-wide-btn" onClick={p.onOpenAgentStore}>Agent Store</button>
       </div>
 
       <div className="sidebar-section">

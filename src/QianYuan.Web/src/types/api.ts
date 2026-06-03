@@ -79,6 +79,73 @@ export interface SessionSummaryDto {
   messageCount: number; createdAt: string; updatedAt: string
 }
 
+export interface AgentStoreSkillDto {
+  id: number
+  skillId: string
+  enabled: boolean
+  priority: number
+}
+
+export interface AgentStoreMcpServerDto {
+  id: number
+  mcpServerId: string
+  serverName: string
+  enabled: boolean
+}
+
+export interface AgentStoreCliServiceDto {
+  id: number
+  cliServiceId: string
+  serviceName: string
+  baseUri: string
+  enabled: boolean
+}
+
+export interface AgentStoreAgentDto {
+  id: string
+  name: string
+  description?: string | null
+  defaultProviderId: string
+  defaultModel: string
+  systemPrompt?: string | null
+  skills: AgentStoreSkillDto[]
+  mcpServers: AgentStoreMcpServerDto[]
+  cliServices: AgentStoreCliServiceDto[]
+  createdAt: string
+  updatedAt: string
+  enabled: boolean
+}
+
+export interface CreateAgentStoreAgentRequest {
+  id: string
+  name: string
+  description?: string | null
+  defaultProviderId?: string | null
+  defaultModel?: string | null
+  systemPrompt?: string | null
+}
+
+export interface AddAgentSkillRequest { skillId: string; priority: number }
+export interface AddAgentMcpServerRequest {
+  mcpServerId: string
+  serverName: string
+  command: string
+  arguments?: string[]
+}
+export interface AddAgentCliServiceRequest {
+  cliServiceId: string
+  serviceName: string
+  baseUri: string
+  authConfig?: unknown
+}
+export interface AgentStoreToolDto {
+  name: string
+  description?: string
+  jsonSchema?: string
+  skillId?: string
+}
+export interface AgentInteractChunk { type: 'text' | 'error'; content: string }
+
 // Knowledge base types
 export interface KnowledgeDocument {
   id: string; title: string; content: string; tags: string[]; createdAt: string;

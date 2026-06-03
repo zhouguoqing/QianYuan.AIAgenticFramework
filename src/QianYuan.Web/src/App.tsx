@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Composer } from './components/Composer'
 import { ChatMessageView } from './components/ChatMessageView'
+import { AgentStore } from './components/AgentStore'
 import { useChat } from './hooks/useChat'
 
 export default function App() {
+  const [view, setView] = useState<'chat' | 'agent-store'>('chat')
   const [agentId, setAgentId] = useState<string | null>(null)
   const [provider, setProvider] = useState<string | null>(null)
   const [model, setModel] = useState<string | null>(null)
@@ -25,6 +27,7 @@ export default function App() {
   return (
     <div className="app">
       <Sidebar
+        onOpenAgentStore={() => setView('agent-store')}
         selectedAgent={agentId} onAgentChange={setAgentId}
         selectedProvider={provider} onProviderChange={setProvider}
         selectedModel={model} onModelChange={setModel}
@@ -33,7 +36,7 @@ export default function App() {
         onNewSession={() => setSessionId(null)}
         onLoadSession={setSessionId}
       />
-      <div className="main">
+      {view === 'agent-store' ? <AgentStore onBack={() => setView('chat')} /> : <div className="main">
         <div className="toolbar">
           <span className="tag">Agent: {agentId ?? '默认'}</span>
           <span className="tag">Provider: {provider ?? 'auto'}</span>
@@ -53,7 +56,7 @@ export default function App() {
             : messages.map(m => <ChatMessageView key={m.id} msg={m} />)}
         </div>
         <Composer busy={busy} onSubmit={send} onAbort={abort} />
-      </div>
+      </div>}
     </div>
   )
 }
