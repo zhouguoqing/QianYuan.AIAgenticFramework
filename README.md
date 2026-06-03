@@ -38,6 +38,7 @@ QianYuan.AgenticFramework/
 │   ├── QianYuan.Providers.QwenNative/    # DashScope 原生
 │   ├── QianYuan.Skills.Builtin/          # WebSearch / Vision / FileSystem / Code
 │   ├── QianYuan.Mcp/                     # MCP Client (stdio) + Server core
+│   ├── QianYuan.UnifyCli/                # 统一 HTTPS 服务封装框架 (REST API → CLI → Skill)
 │   ├── QianYuan.Integrations.DingTalk/   # 钉钉 webhook 收发
 │   ├── QianYuan.Api/                     # ASP.NET Core 10 host (SSE + SignalR + Swagger)
 │   └── QianYuan.Web/                     # React + Vite WebUI
@@ -522,7 +523,186 @@ app.Services.MountMcpSkills();
 注册完成后，`GET /api/skills` 可查看 catalog；ReAct 每轮会调用 `SelectRelevantAsync(intent, topK)` 选择当前最相关的 Skill。
 
 这类 Markdown Skill 是“提示型技能”，不会执行外部命令或暴露工具调用；需要真实工具能力时仍建议实现 `ISkill` 或通过 MCP 挂载。
+## UnifyCli：统一 HTTPS 服务封装
 
+### 概览
+
+`QianYuan.UnifyCli` 是一个通用框架，用于将任何 HTTPS 服务或 REST API 统一封装为 CLI 方法，
+并通过 Skill 系统无缝集成到 Agent 中。它解决了"如何让 Agent 快速调用第三方 API"的问题。
+
+**核心场景**：
+- 集成 GitHub / Slack / OpenAI 等第三方 API
+- 包装内部微服务供 Agent 调用
+- 数据聚合（多个 API → 统一接口）
+- 实现通用的 API 网关和代理
+
+### 架构
+
+```
+Agent Request
+    ↓
+CliServiceSkill (Skill Adapter)
+    ↓
+CliService (Method Registry)
+    ↓
+UnifyHttpClient (HTTP Executor)
+    ├─ Parameter Interpolation (path, query, body)
+    ├─ Authentication (Basic/Bearer/ApiKey/Custom)
+    ├─ Retry & Timeout
+    └─ Response Transformation
+    ↓
+External HTTPS Service / REST API
+```
+
+### 快速开始
+
+#### 1. DI 配置
+
+```csharp
+builder.Services.AddUnifyCli();
+```
+
+#### 2. 定义 CLI 服务
+
+```csharp
+using QianYuan.UnifyCli.Implementation;
+using System.Text.Json;
+
+var userService = new CliServiceDefinition
+{
+    Id = "user.api",
+    Name = "User Service",
+    Description = "API for user management",
+    BaseUri = "https://api.example.com"
+};
+```
+
+#### 3. 定义 CLI 方法
+
+```csharp
+var getUserMethod = new CliMethodDefinition
+{
+    Id = "get_user",
+    Name = "Get User",
+    Description = "Get user info by ID",
+    HttpMethod = "GET",
+    PathTemplate = "/v1/users/{userId}",
+    ParametersSchema = JsonSerializer.Serialize(new
+    {
+        type = "object",
+        properties = new
+        {
+            userId = new { type = "string", description = "User ID" }
+        },
+        required = new[] { "userId" }
+    }),
+    Tags = new[] { "user", "profile" }
+};
+
+userService.RegisterMethod(getUserMethod);
+```
+
+#### 4. 注册服务
+
+```csharp
+builder.Services.AddCliService(userService);
+```
+
+#### 5. 在 Agent 中使用
+
+```csharp
+// 自动作为 Skill 暴露给 Agent
+var skillFactory = sp.GetRequiredService<CliServiceSkillFactory>();
+var skill = await skillFactory.CreateSkillAsync("user.api");
+
+// 现在 Agent 可以调用 "get_user" 工具
+```
+
+### 认证支持
+
+UnifyCli 开箱支持 5 种认证方式：
+
+| 方式 | 用途 | 配置 |
+|------|------|------|
+| **No Auth** | 公开 API | `type: "none"` |
+| **Basic** | 用户名/密码 | `type: "basic"`, `username`, `password` |
+| **Bearer** | JWT / OAuth2 Token | `type: "bearer"`, `token` |
+| **API Key** | Header 或 Query 参数 | `type: "api_key"`, `token`, `headerName` 或 `queryParamName` |
+| **Custom** | 自定义 Header | `type: "custom"`, `headers: {...}` |
+
+示例：
+
+```csharp
+var authFactory = new AuthenticationProviderFactory();
+var authOptions = new AuthenticationOptions
+{
+    Type = "bearer",
+    Token = "eyJhbGciOiJIUzI1NiIs..."
+};
+
+service.DefaultAuthenticationProvider = authFactory.Create(authOptions);
+```
+
+### 参数处理
+
+UnifyCli 自动处理三种参数映射：
+
+#### 路径参数
+
+```csharp
+PathTemplate = "/v1/users/{userId}/posts/{postId}"
+// 调用时：InvokeAsync("...", @"{""userId"":""123"",""postId"":""456""}")
+// 转换为：GET /v1/users/123/posts/456
+```
+
+#### Query 参数
+
+```csharp
+QueryParams = new Dictionary<string, string>
+{
+    { "limit", "$limit" },      // 从参数中取 limit
+    { "sort", "date" }          // 固定值
+}
+// 调用时：InvokeAsync("...", @"{""limit"":10}")
+// 转换为：GET /v1/items?limit=10&sort=date
+```
+
+#### Request Body
+
+```csharp
+RequestBodyTemplate = "$."  // 整个参数作为 JSON body
+// 或
+RequestBodyTemplate = "$.user"  // 只取参数中的 user 字段
+```
+
+### 响应转换
+
+如果外部 API 返回复杂结构，可以用 JsonPath 提取特定字段：
+
+```csharp
+ResponseTransformer = new JsonPathResponseTransformer("$.data.items")
+// 原始响应：{ "data": { "items": [...] }, "meta": {...} }
+// 转换后：[...]
+```
+
+### 完整示例
+
+详见 [samples/QianYuan.Sample.Console/UnifyCliIntegrationExample.cs](samples/QianYuan.Sample.Console/UnifyCliIntegrationExample.cs)，
+包含 7 个场景：基本使用、认证、注册表发现、DI 集成、Skill 集成、错误处理、完整应用配置。
+
+也可查看内置示例服务：
+
+- `WeatherServiceExample`：OpenWeatherMap API (GET + 认证)
+- `GitHubServiceExample`：GitHub REST API (多个 endpoint + Bearer auth)
+- `SlackServiceExample`：Slack API (POST + JSON body)
+
+### 详细文档
+
+| 文档 | 说明 |
+|------|------|
+| [README.md](src/QianYuan.UnifyCli/README.md) | 完整 API 参考、配置选项、最佳实践、安全考虑 |
+| [QUICKSTART.md](src/QianYuan.UnifyCli/QUICKSTART.md) | 5 分钟快速开始、常见模式、FAQ |
+| [ARCHITECTURE.md](src/QianYuan.UnifyCli/ARCHITECTURE.md) | 系统架构、数据流、扩展设计 |
 ## 钉钉
 
 1. 创建自定义机器人，拿 outgoing webhook URL + 加签 secret。
