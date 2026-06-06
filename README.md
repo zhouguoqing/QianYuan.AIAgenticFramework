@@ -18,6 +18,7 @@
 | Vision 技能 | `image_describe` 工具，路由到任意支持视觉的 Provider |
 | MCP | JSON-RPC 2.0 Client (stdio) + Server (HTTP/SSE + 把本地 Skill 暴露给外部) |
 | Agent 注册 | `IAgentRegistry`，Agent 之间可互相调用 (`agent.<id>` 工具) |
+| Agent Store | 可视化创建、编辑、编排和测试企业智能体；支持挂载 Skill、MCP Server、CLI Service |
 | WebUI | React 19 + Vite + TS，SSE 流式渲染、Markdown、图片粘贴 |
 | 钉钉 | 自定义机器人签名校验 + 分段 Markdown 卡片更新 |
 
@@ -40,8 +41,8 @@ QianYuan.AgenticFramework/
 │   ├── QianYuan.Mcp/                     # MCP Client (stdio) + Server core
 │   ├── QianYuan.UnifyCli/                # 统一 HTTPS 服务封装框架 (REST API → CLI → Skill)
 │   ├── QianYuan.Integrations.DingTalk/   # 钉钉 webhook 收发
-│   ├── QianYuan.Api/                     # ASP.NET Core 10 host (SSE + SignalR + Swagger)
-│   └── QianYuan.Web/                     # React + Vite WebUI
+│   ├── QianYuan.Api/                     # ASP.NET Core 10 host (SSE + SignalR + Swagger + Agent Store API)
+│   └── QianYuan.Web/                     # React + Vite WebUI（含 Agent Store 管理界面）
 ├── samples/QianYuan.Sample.Console/
 └── tests/QianYuan.Core.Tests/            # xUnit + FluentAssertions
 ```
@@ -523,6 +524,69 @@ app.Services.MountMcpSkills();
 注册完成后，`GET /api/skills` 可查看 catalog；ReAct 每轮会调用 `SelectRelevantAsync(intent, topK)` 选择当前最相关的 Skill。
 
 这类 Markdown Skill 是“提示型技能”，不会执行外部命令或暴露工具调用；需要真实工具能力时仍建议实现 `ISkill` 或通过 MCP 挂载。
+## Agent Store：企业智能体商店
+
+Agent Store 是 QianYuan 面向企业 Agent 落地的可视化编排与运行入口，用来把“可复用能力”沉淀成可管理、可测试、可上线的 Agent。
+它不是单纯的提示词列表，而是把 Agent Profile、模型 Provider、系统提示、Skill、MCP Server 与 CLI Service 组合成一个完整智能体。
+
+### 核心能力
+
+- **Agent 档案管理**：创建、编辑、删除 Agent，维护 `id`、名称、描述、默认 Provider、默认模型与 system prompt。
+- **Skill 编排**：从 `ISkillManager` 已注册的 Markdown Skill、内置 Skill、自定义 `ISkill` 中选择能力，并按优先级挂载到指定 Agent。
+- **MCP Server 集成**：为单个 Agent 关联外部 MCP Server，把文件系统、浏览器、数据库、第三方工具等 MCP 能力纳入工具列表。
+- **CLI Service 集成**：通过 UnifyCli 把内部微服务或第三方 HTTPS API 封装为 Agent 工具，支持认证、参数映射和响应转换。
+- **工具清单与单工具测试**：查看当前 Agent 聚合后的全部工具，并可直接传入 JSON 参数测试单个工具。
+- **Agent 交互测试**：在 WebUI 中直接向指定 Agent 发起对话，验证模型、提示词和工具链协同效果。
+
+### WebUI 使用方式
+
+启动 WebUI 后，在界面进入 **Agent Store**：
+
+1. 点击“新建 Agent”，填写唯一 ID、名称、描述、Provider、模型和系统提示。
+2. 在 **Skills** 页签挂载已有 Skill，并设置 priority 控制优先级。
+3. 在 **MCP** 页签添加 MCP Server，例如 filesystem、browser、database 等工具服务。
+4. 在 **CLI** 页签添加通过 UnifyCli 暴露的 HTTPS 服务。
+5. 在 **Test** 页签查看工具列表、测试单个工具，或直接与 Agent 对话。
+
+### Agent Store API
+
+后端统一暴露在 `/api/agent-store`：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/api/agent-store` | 获取 Agent 列表 |
+| `GET` | `/api/agent-store/{agentId}` | 获取指定 Agent 详情 |
+| `POST` | `/api/agent-store` | 创建 Agent |
+| `PUT` | `/api/agent-store/{agentId}` | 更新 Agent |
+| `DELETE` | `/api/agent-store/{agentId}` | 删除 Agent |
+| `POST` | `/api/agent-store/{agentId}/skills` | 给 Agent 挂载 Skill |
+| `DELETE` | `/api/agent-store/{agentId}/skills/{skillRowId}` | 移除已挂载 Skill |
+| `POST` | `/api/agent-store/{agentId}/mcp-servers` | 关联 MCP Server |
+| `DELETE` | `/api/agent-store/{agentId}/mcp-servers/{serverRowId}` | 移除 MCP Server |
+| `POST` | `/api/agent-store/{agentId}/cli-services` | 关联 CLI Service |
+| `DELETE` | `/api/agent-store/{agentId}/cli-services/{serviceRowId}` | 移除 CLI Service |
+| `GET` | `/api/agent-store/{agentId}/tools` | 获取该 Agent 聚合后的工具清单 |
+| `POST` | `/api/agent-store/{agentId}/test-tool` | 测试单个工具调用 |
+| `POST` | `/api/agent-store/{agentId}/interact` | 与该 Agent 进行交互测试 |
+
+创建 Agent 的最小请求示例：
+
+```json
+{
+  "id": "sales-assistant",
+  "name": "销售助手",
+  "description": "面向售前方案、客户问答和商机跟进的企业智能体",
+  "defaultProviderId": "openai",
+  "defaultModel": "gpt-4o-mini",
+  "systemPrompt": "你是专业、稳健的企业销售助手。"
+}
+```
+
+### 设计定位
+
+Agent Store 适合承载“企业内部智能体市场”：研发、售前、运维、客服、财务等角色可以沉淀为独立 Agent；
+每个 Agent 通过 Skill/MCP/CLI 组合自己的工具边界，既方便复用，也便于后续做权限、审计、发布状态、版本管理和多租户隔离。
+
 ## UnifyCli：统一 HTTPS 服务封装
 
 ### 概览
