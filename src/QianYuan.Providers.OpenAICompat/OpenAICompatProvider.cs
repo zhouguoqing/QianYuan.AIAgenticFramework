@@ -13,7 +13,7 @@ namespace QianYuan.Providers.OpenAICompat;
 
 /// <summary>
 /// OpenAI Chat Completions compatible provider.
-/// Supports streaming SSE, multi-part user content (vision), tool calls (including parallel & streamed args).
+/// Supports streaming SSE, multi-part user content (vision), tool calls (including parallel and streamed args).
 /// </summary>
 public sealed class OpenAICompatProvider : ILlmProvider
 {
@@ -63,7 +63,11 @@ public sealed class OpenAICompatProvider : ILlmProvider
     public async Task<ChatResponse> CompleteAsync(ChatRequest request, CancellationToken ct = default)
     {
         var body = BuildBody(request, stream: false);
-        using var resp = await _http.PostAsJsonAsync("chat/completions", body, JsonOpts, ct).ConfigureAwait(false);
+        using var req = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
+        {
+            Content = JsonContentFromObject(body)
+        };
+        using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
         await EnsureSuccessAsync(resp, ct).ConfigureAwait(false);
         var json = await resp.Content.ReadFromJsonAsync<JsonNode>(JsonOpts, ct).ConfigureAwait(false)
                    ?? throw new LlmProviderException(ProviderId, "empty response");
@@ -106,7 +110,7 @@ public sealed class OpenAICompatProvider : ILlmProvider
         var body = BuildBody(request, stream: true);
         using var req = new HttpRequestMessage(HttpMethod.Post, "chat/completions")
         {
-            Content = JsonContent.Create(body, options: JsonOpts)
+            Content = JsonContentFromObject(body)
         };
         req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
 
@@ -207,6 +211,20 @@ public sealed class OpenAICompatProvider : ILlmProvider
         }
 
         yield return StreamingChunk.End(finishReason ?? "stop", usage);
+    }
+
+    /// <summary>
+    /// Serialise the body to a fixed-length byte array so the request always carries
+    /// an explicit Content-Length header and never falls back to Transfer-Encoding:
+    /// chunked. Some OpenAI-compatible gateways (new-api / one-api) reject chunked
+    /// request bodies with "invalid byte in chunk length".
+    /// </summary>
+    private static HttpContent JsonContentFromObject(object body)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(body, JsonOpts);
+        var content = new ByteArrayContent(bytes);
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        return content;
     }
 
     private object BuildBody(ChatRequest request, bool stream)

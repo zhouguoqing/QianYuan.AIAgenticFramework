@@ -63,6 +63,7 @@ public sealed class ReActAgent : IAgent
                 UseProgressiveSelection = _def.UseProgressiveSkillLoading,
                 ProgressiveTopK = _def.ProgressiveTopK,
                 ExposeAgentsAsTools = _def.ExposeAgentsAsTools,
+                LoopEngineering = _def.LoopEngineering,
             });
 
         // Build per-turn dispatcher with a tool-name -> skill-id resolver from the engine's live map.
@@ -150,6 +151,8 @@ public sealed class ReActAgentDefinition
     public bool UseProgressiveSkillLoading { get; init; } = true;
     public int ProgressiveTopK { get; init; } = 8;
     public bool ExposeAgentsAsTools { get; init; } = true;
+
+    public LoopEngineeringOptions LoopEngineering { get; init; } = new();
 
     /// <summary>If set, only these skills are mounted (progressive selection still allowed within).</summary>
     public IReadOnlyList<string>? PreloadSkills { get; init; }

@@ -69,6 +69,7 @@ public sealed class ReActEngine
         var maxIter = request.MaxIterations ?? _opts.MaxIterations;
         TokenUsage? lastUsage = null;
         string? finishReason = null;
+        var loop = request.LoopEngineering ?? new LoopEngineeringRuntime(_opts.LoopEngineering);
 
         while (true)
         {
@@ -105,7 +106,13 @@ public sealed class ReActEngine
 
             var chatReq = new ChatRequest
             {
-                Messages = BuildMessagesWithSystem(workingMessages, request.SystemPrompt, activeSkills, skillPromptFragments),
+                Messages = loop.PrepareMessages(
+                    workingMessages,
+                    request.SystemPrompt,
+                    activeSkills,
+                    skillPromptFragments,
+                    iteration,
+                    maxIter),
                 Tools = allTools.Count == 0 ? null : allTools,
                 Options = new GenerationOptions
                 {
@@ -235,30 +242,20 @@ public sealed class ReActEngine
                 SkillInvocationResult result;
                 try
                 {
-                    result = await dispatch.InvokeAsync(call.Name, call.Args.ToString(), ctx, ct).ConfigureAwait(false);
+                    result = loop.TryBlockToolCall(call.Name, call.Args.ToString())
+                        ?? await dispatch.InvokeAsync(call.Name, call.Args.ToString(), ctx, ct).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     result = SkillInvocationResult.Error(ex.Message);
                 }
 
+                result = loop.BoundObservation(result);
+
                 workingMessages.Add(ChatMessage.Tool(id, result.JsonContent, result.HumanSummary));
 
-                // Build a user-visible observation: human summary if present, else the raw JSON
-                // payload (truncated). This is what the Web UI surfaces under "工具结果".
-                var observationText = !string.IsNullOrWhiteSpace(result.HumanSummary)
-                    ? result.HumanSummary!
-                    : (result.IsError ? "tool error" : "");
-                if (!string.IsNullOrWhiteSpace(result.JsonContent) && result.JsonContent != "{}")
-                {
-                    var snippet = result.JsonContent.Length > 4000
-                        ? result.JsonContent[..4000] + "\n…(truncated)"
-                        : result.JsonContent;
-                    observationText = string.IsNullOrEmpty(observationText)
-                        ? snippet
-                        : observationText + "\n\n" + snippet;
-                }
-                if (string.IsNullOrEmpty(observationText)) observationText = "tool ok";
+                // Build a user-visible observation. This is what the Web UI surfaces under "工具结果".
+                var observationText = loop.BuildObservationText(result);
 
                 yield return StreamingChunk.Observation(observationText, id) with
                 {
@@ -280,7 +277,7 @@ public sealed class ReActEngine
         }
     }
 
-    private static IReadOnlyList<ChatMessage> BuildMessagesWithSystem(
+    internal static IReadOnlyList<ChatMessage> BuildMessagesWithSystem(
         IReadOnlyList<ChatMessage> conversation,
         string? systemPrompt,
         IReadOnlyCollection<string> activeSkills,
@@ -364,6 +361,9 @@ public sealed class ReActEngineOptions
 
     /// <summary>If true, every other registered agent is exposed as an "agent.&lt;id&gt;" tool.</summary>
     public bool ExposeAgentsAsTools { get; init; } = true;
+
+    /// <summary>Claude Code style loop engineering controls for harness prompts, context, and tool guards.</summary>
+    public LoopEngineeringOptions LoopEngineering { get; init; } = new();
 }
 
 public sealed class ReActRunRequest
@@ -377,4 +377,5 @@ public sealed class ReActRunRequest
     public IReadOnlyList<string>? PreloadSkills { get; init; }
     public int? MaxIterations { get; init; }
     public IReadOnlyDictionary<string, string>? Metadata { get; init; }
+    internal LoopEngineeringRuntime? LoopEngineering { get; init; }
 }

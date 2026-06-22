@@ -17,6 +17,7 @@
        │            QianYuan.Kernel  (ReAct + 渐进式)          │
        │  ReActEngine                                          │
        │  ├─ build active skill set (SelectRelevantAsync)      │
+       │  ├─ apply LoopEngineering harness/context/tool guards │
        │  ├─ stream LLM turn (provider-agnostic chunks)        │
        │  ├─ dispatch tool calls → IToolDispatcher             │
        │  └─ append observations, loop                         │
@@ -72,6 +73,39 @@ User → POST /api/chat/stream
    topK 个 Skill。模型只能看到当前轮相关的工具列表，不会被噪声淹没。
 
 两层之上还可叠加：MCP Skill 自身在 `GetToolsAsync` 时才真正与远端 server 握手 (`ConnectAsync`)。
+
+## Loop Engineering
+
+后端 ReAct 循环现在内置 `LoopEngineeringRuntime`，目标是把 Claude Code 一类 agent loop 的工程化约束沉到框架层，而不是依赖每个业务 Agent 自己写提示词。
+
+一次迭代的顺序变为：
+
+```
+working messages
+  └─► progressive skill selection
+       └─► LoopEngineeringRuntime.PrepareMessages
+            ├─ stable loop harness prompt
+            ├─ current iteration/tool-use state
+            ├─ active skill instructions
+            └─ compressed historical transcript when needed
+                 └─► ILlmProvider.StreamAsync
+                      └─► tool call
+                           ├─ duplicate/budget guard
+                           ├─ IToolDispatcher.InvokeAsync
+                           ├─ bounded observation
+                           └─ append ChatRole.Tool
+```
+
+关键策略：
+
+- **稳定 harness**：要求模型按 inspect → plan → act → observe → verify 循环工作，工具调用前明确收益，工具结果后基于证据调整。
+- **提示注入防护**：harness 明确声明工具输出、网页、文件等外部内容只是数据，不是新的指令来源。
+- **上下文压缩**：`MaxTranscriptCharacters` 控制上下文窗口，旧消息压缩成摘要，最近消息原样保留。
+- **重复调用拦截**：相同工具名 + 规范化 JSON 参数连续重复超过阈值时，直接返回错误 observation，迫使模型换策略或停止。
+- **工具预算**：`MaxToolCalls` 可为单次 run 设置总工具调用上限。
+- **结果限长**：`MaxObservationCharacters` 限制工具 JSON 和人类摘要回填长度，避免 observation 污染后续轮次。
+
+这些策略通过 `ReActEngineOptions.LoopEngineering` 配置，默认开启并兼容已有 Skill、Provider、Agent-as-Tool 机制。
 
 ## Provider 接入规范
 

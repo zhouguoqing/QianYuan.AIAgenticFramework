@@ -226,6 +226,140 @@ public class ReActEngineTests
         exception.Which.Limit.Should().Be(1);
     }
 
+    [Fact]
+    public async Task Loop_engineering_injects_harness_and_loop_state()
+    {
+        var skills = new SkillManager(EmptyServices.Instance, NullLogger<SkillManager>.Instance);
+        var provider = new ScriptedProvider(new[]
+        {
+            new StreamingChunk[]
+            {
+                StreamingChunk.Start(),
+                StreamingChunk.OfText("done"),
+                StreamingChunk.End("stop"),
+            }
+        });
+
+        var engine = new ReActEngine(provider, skills, new AgentRegistry(), NullLogger<ReActEngine>.Instance,
+            new ReActEngineOptions
+            {
+                MaxIterations = 3,
+                UseProgressiveSelection = false,
+                ExposeAgentsAsTools = false,
+                LoopEngineering = new LoopEngineeringOptions { HarnessPrompt = "custom loop harness" }
+            });
+
+        await foreach (var _ in engine.RunAsync(new ReActRunRequest
+        {
+            InitialMessages = new[] { ChatMessage.User("hello") },
+            SessionId = "s",
+            Services = EmptyServices.Instance,
+            Dispatcher = new SimpleDispatcher(skills),
+        })) { }
+
+        provider.SeenSystemPrompts.Should().ContainSingle(s =>
+            s.Contains("custom loop harness", StringComparison.Ordinal)
+            && s.Contains("Loop state:", StringComparison.Ordinal)
+            && s.Contains("Iteration: 1/3", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Loop_engineering_blocks_repeated_identical_tool_calls()
+    {
+        var skills = new SkillManager(EmptyServices.Instance, NullLogger<SkillManager>.Instance);
+        skills.Register(new EchoSkill());
+        var provider = new ScriptedProvider(new[]
+        {
+            new StreamingChunk[]
+            {
+                StreamingChunk.Start(),
+                new StreamingChunk { Kind = StreamingChunkKind.ToolCallStart, ToolCallId = "t1", ToolName = "echo" },
+                new StreamingChunk { Kind = StreamingChunkKind.ToolCallEnd, ToolCallId = "t1", ToolName = "echo", ToolArgsJson = "{\"msg\":\"same\"}" },
+                StreamingChunk.End("tool_use"),
+            },
+            new StreamingChunk[]
+            {
+                StreamingChunk.Start(),
+                new StreamingChunk { Kind = StreamingChunkKind.ToolCallStart, ToolCallId = "t2", ToolName = "echo" },
+                new StreamingChunk { Kind = StreamingChunkKind.ToolCallEnd, ToolCallId = "t2", ToolName = "echo", ToolArgsJson = "{\"msg\":\"same\"}" },
+                StreamingChunk.End("tool_use"),
+            },
+            new StreamingChunk[]
+            {
+                StreamingChunk.Start(),
+                StreamingChunk.OfText("stopped"),
+                StreamingChunk.End("stop"),
+            }
+        });
+
+        var engine = new ReActEngine(provider, skills, new AgentRegistry(), NullLogger<ReActEngine>.Instance,
+            new ReActEngineOptions { MaxIterations = 5, UseProgressiveSelection = false, ExposeAgentsAsTools = false });
+
+        var observations = new List<StreamingChunk>();
+        await foreach (var c in engine.RunAsync(new ReActRunRequest
+        {
+            InitialMessages = new[] { ChatMessage.User("repeat") },
+            SessionId = "s",
+            Services = EmptyServices.Instance,
+            Dispatcher = new SimpleDispatcher(skills),
+            PreloadSkills = new[] { "echo" },
+        }))
+        {
+            if (c.Kind == StreamingChunkKind.ToolObservation) observations.Add(c);
+        }
+
+        observations.Should().HaveCount(2);
+        observations[0].Text.Should().Contain("echoed");
+        observations[1].Text.Should().Contain("Repeated identical tool call blocked");
+    }
+
+    [Fact]
+    public async Task Loop_engineering_compresses_large_transcript_before_provider_call()
+    {
+        var skills = new SkillManager(EmptyServices.Instance, NullLogger<SkillManager>.Instance);
+        var provider = new ScriptedProvider(new[]
+        {
+            new StreamingChunk[]
+            {
+                StreamingChunk.Start(),
+                StreamingChunk.OfText("done"),
+                StreamingChunk.End("stop"),
+            }
+        });
+
+        var engine = new ReActEngine(provider, skills, new AgentRegistry(), NullLogger<ReActEngine>.Instance,
+            new ReActEngineOptions
+            {
+                MaxIterations = 2,
+                UseProgressiveSelection = false,
+                ExposeAgentsAsTools = false,
+                LoopEngineering = new LoopEngineeringOptions
+                {
+                    MaxTranscriptCharacters = 50,
+                    MinRecentMessagesToKeep = 1,
+                    MaxCompressedMessageCharacters = 20,
+                }
+            });
+
+        await foreach (var _ in engine.RunAsync(new ReActRunRequest
+        {
+            InitialMessages = new[]
+            {
+                ChatMessage.User(new string('a', 100)),
+                ChatMessage.Assistant(new string('b', 100)),
+                ChatMessage.User("latest")
+            },
+            SessionId = "s",
+            Services = EmptyServices.Instance,
+            Dispatcher = new SimpleDispatcher(skills),
+        })) { }
+
+        provider.SeenSystemPrompts.Should().Contain(s =>
+            s.Contains("Compressed conversation history", StringComparison.Ordinal)
+            && s.Contains("aaaaaaaaaaaaaaaaaaaa", StringComparison.Ordinal)
+            && s.Contains("…(truncated by loop engineering)", StringComparison.Ordinal));
+    }
+
     private sealed class EchoSkill : ISkill
     {
         public string Id => "echo";
@@ -289,11 +423,13 @@ public class ReActEngineTests
         public string DefaultModel => "fake";
         public LlmCapabilities Capabilities => LlmCapabilities.Streaming | LlmCapabilities.Tools;
         public List<string> SeenSystemPrompts { get; } = new();
+        public List<IReadOnlyList<ChatMessage>> SeenMessages { get; } = new();
         public Task<ChatResponse> CompleteAsync(ChatRequest r, CancellationToken ct = default) => throw new NotImplementedException();
         public async IAsyncEnumerable<StreamingChunk> StreamAsync(ChatRequest r, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
             var system = r.Messages.FirstOrDefault(m => m.Role == ChatRole.System)?.AsPlainText();
             if (system is not null) SeenSystemPrompts.Add(system);
+            SeenMessages.Add(r.Messages);
             var script = _turns.Dequeue();
             foreach (var c in script) { await Task.Yield(); yield return c; }
         }

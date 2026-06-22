@@ -192,15 +192,42 @@ ToolCallEnd / ToolObservation / Usage / End / Error / Warning)，
 `QianYuan.Kernel.ReAct.ReActEngine` 每轮：
 
 1. 用 `ISkillManager.SelectRelevantAsync(intent, topK)` 渐进式挑选 Skill。
-2. 把已挑选 Skill 的工具 + 注册的其他 Agent (作为 `agent.<id>` 工具) 合并发给 LLM。
-3. 流式接收 LLM 输出：
+2. 通过 `LoopEngineeringRuntime` 注入稳定 harness、循环状态，并在上下文过大时压缩旧消息。
+3. 把已挑选 Skill 的工具 + 注册的其他 Agent (作为 `agent.<id>` 工具) 合并发给 LLM。
+4. 流式接收 LLM 输出：
    - 文本/思考 → 直接转发给上层。
    - ToolCall (流式 args) → 累积后通过 `IToolDispatcher` 路由到对应 Skill 或子 Agent。
    - Tool 结果 → 作为 `ChatRole.Tool` 消息追加到历史，继续下一轮。
-4. 没有新 ToolCall → 终止，发 `End`。
+5. 没有新 ToolCall → 终止，发 `End`。
 
 每轮都会重新计算活动 Skill 集合，所以"渐进式扩展"是自动发生的。
 默认 Agent 的最大 ReAct 迭代次数由 `QianYuan.DefaultAgentMaxIterations` 控制，默认值为 `100`；单次请求仍可通过 `MaxIterations` 覆盖。
+
+### Loop Engineering
+
+`QianYuan.Kernel.ReAct.LoopEngineeringOptions` 参考 Claude Code 的 agent loop/harness 思路，把 ReAct 从“简单 while tool-call”升级为可控后端循环：
+
+- **Harness Prompt**：默认提示模型按 inspect → plan → act → observe → verify 工作，并把外部内容当数据而不是指令。
+- **Loop State**：每轮 system prompt 注入当前迭代、最大迭代、总工具调用数和各工具使用次数。
+- **Context Compression**：当 transcript 超过 `MaxTranscriptCharacters` 时，把旧消息压缩成连续性摘要，保留最近 `MinRecentMessagesToKeep` 条消息。
+- **Tool Guards**：支持 `MaxToolCalls` 总预算和重复相同工具调用拦截，避免模型盲目重试。
+- **Observation Bounds**：限制工具结果回填长度，避免单次 observation 挤爆上下文。
+
+默认已启用；可在构造 `ReActEngineOptions` 时覆盖：
+
+```csharp
+new ReActEngineOptions
+{
+    MaxIterations = 100,
+    LoopEngineering = new LoopEngineeringOptions
+    {
+        MaxTranscriptCharacters = 80_000,
+        MaxToolCalls = 40,
+        MaxConsecutiveIdenticalToolCalls = 1,
+        HarnessPrompt = "your custom loop harness"
+    }
+}
+```
 
 ```json
 {

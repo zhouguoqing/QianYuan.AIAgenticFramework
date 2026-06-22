@@ -13,7 +13,16 @@ public static class OpenAICompatExtensions
     /// </summary>
     public static IServiceCollection AddOpenAICompatProvider(this IServiceCollection services, OpenAICompatOptions options)
     {
-        services.AddHttpClient($"qianyuan.{options.ProviderId}");
+        // Bypass the system/forwarding proxy (e.g. http_proxy env var). LLM API traffic
+        // must go direct to the endpoint; a forwarding proxy can corrupt the chunked
+        // transfer-encoding of the request body, causing upstream gateways (new-api,
+        // one-api, etc.) to reject with "invalid byte in chunk length" (HTTP 400).
+        services.AddHttpClient($"qianyuan.{options.ProviderId}")
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                UseProxy = false,
+                PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            });
 
         services.AddSingleton<ILlmProvider>(sp =>
         {
