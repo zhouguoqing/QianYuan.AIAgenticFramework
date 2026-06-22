@@ -8,7 +8,7 @@
 | 维度 | 实现 |
 |------|------|
 | 语言/平台 | C# 13 / .NET 10 |
-| Agent 模式 | ReAct (Thought-Action-Observation) 循环；Agent-as-Tool 嵌套调用 |
+| Agent 模式 | ReAct (Thought-Action-Observation) 循环；Loop Engineering；Agent-as-Tool 嵌套调用 |
 | Skill 体系 | 抽象 `ISkill` + `SkillManager` 渐进式加载；按用户意图打分挑选 topK |
 | Markdown Skill | 从指定目录递归加载业界常见 `Skill.md` / `SKILL.md`，将 frontmatter 映射为 Skill 清单，正文作为激活后的系统提示 |
 | 模型 Provider | OpenAI 兼容 (GPT/Kimi/MiniMax/Qwen-compat/DeepSeek/OpenRouter/NEWAPI)、Azure OpenAI、Anthropic Claude、Google Gemini、Qwen DashScope 原生 |
@@ -207,11 +207,30 @@ ToolCallEnd / ToolObservation / Usage / End / Error / Warning)，
 
 `QianYuan.Kernel.ReAct.LoopEngineeringOptions` 参考 Claude Code 的 agent loop/harness 思路，把 ReAct 从“简单 while tool-call”升级为可控后端循环：
 
-- **Harness Prompt**：默认提示模型按 inspect → plan → act → observe → verify 工作，并把外部内容当数据而不是指令。
-- **Loop State**：每轮 system prompt 注入当前迭代、最大迭代、总工具调用数和各工具使用次数。
-- **Context Compression**：当 transcript 超过 `MaxTranscriptCharacters` 时，把旧消息压缩成连续性摘要，保留最近 `MinRecentMessagesToKeep` 条消息。
-- **Tool Guards**：支持 `MaxToolCalls` 总预算和重复相同工具调用拦截，避免模型盲目重试。
-- **Observation Bounds**：限制工具结果回填长度，避免单次 observation 挤爆上下文。
+- **Harness Prompt**：默认提示模型按 inspect → plan → act → observe → verify 工作；每次工具调用前明确收益，每次 observation 后基于证据更新策略。
+- **Prompt Injection Boundary**：明确把工具输出、网页、文件、MCP 返回值等外部内容视为数据，而不是新的系统/开发者指令。
+- **Loop State**：每轮 system prompt 注入当前迭代、最大迭代、总工具调用数和各工具使用次数，让模型知道自己处于第几轮、还剩多少预算。
+- **Context Compression**：当 transcript 超过 `MaxTranscriptCharacters` 时，把旧消息压缩成连续性摘要，保留最近 `MinRecentMessagesToKeep` 条消息，降低长任务上下文爆炸风险。
+- **Tool Guards**：支持 `MaxToolCalls` 总预算和重复相同工具调用拦截，避免模型盲目重试、死循环或浪费 token。
+- **Observation Bounds**：限制工具结果回填长度，避免单次 observation 挤爆上下文；UI 仍能看到截断后的可读摘要。
+- **Agent-level Override**：`ReActAgentDefinition.LoopEngineering` 可为不同 Agent 设置不同循环策略，比如研究型 Agent 放宽预算、执行型 Agent 收紧重复调用阈值。
+
+完整循环链路：
+
+```text
+User messages
+  └─► SelectRelevantAsync(intent) 渐进式选 Skill
+       └─► LoopEngineeringRuntime.PrepareMessages
+            ├─ 合并业务 SystemPrompt
+            ├─ 注入 Loop harness 与循环状态
+            ├─ 注入 active skill instructions
+            └─ 必要时压缩旧上下文
+                 └─► ILlmProvider.StreamAsync
+                      ├─ TextDelta / ThinkingDelta → 透传给上层
+                      └─ ToolCall → duplicate/budget guard
+                           └─► IToolDispatcher.InvokeAsync
+                                └─► bounded observation → ChatRole.Tool → 下一轮
+```
 
 默认已启用；可在构造 `ReActEngineOptions` 时覆盖：
 
@@ -222,12 +241,51 @@ new ReActEngineOptions
     LoopEngineering = new LoopEngineeringOptions
     {
         MaxTranscriptCharacters = 80_000,
+        MinRecentMessagesToKeep = 12,
+        MaxObservationCharacters = 12_000,
         MaxToolCalls = 40,
         MaxConsecutiveIdenticalToolCalls = 1,
         HarnessPrompt = "your custom loop harness"
     }
 }
 ```
+
+也可以在 Agent 定义层覆盖：
+
+```csharp
+new ReActAgentDefinition
+{
+    Id = "researcher",
+    Name = "Research Agent",
+    Description = "Long-running research agent",
+    LoopEngineering = new LoopEngineeringOptions
+    {
+        MaxToolCalls = 80,
+        MaxTranscriptCharacters = 120_000,
+        MaxConsecutiveIdenticalToolCalls = 2
+    }
+}
+```
+
+常用参数：
+
+| 参数 | 默认值 | 作用 |
+|------|--------|------|
+| `Enabled` | `true` | 总开关；关闭后退回普通 ReAct 消息构造。 |
+| `AddHarnessPrompt` | `true` | 是否注入默认 loop harness。 |
+| `IncludeLoopStateInPrompt` | `true` | 是否注入迭代数与工具使用计数。 |
+| `MaxTranscriptCharacters` | `80_000` | 超过该字符数后压缩旧 transcript。 |
+| `MinRecentMessagesToKeep` | `12` | 上下文压缩时保留的最近消息数量。 |
+| `MaxObservationCharacters` | `12_000` | 单次工具 observation 回填最大长度。 |
+| `MaxConsecutiveIdenticalToolCalls` | `1` | 连续相同工具名 + JSON 参数允许次数。 |
+| `MaxToolCalls` | `null` | 单次 run 的工具调用总预算；`null` 表示不额外限制。 |
+
+建议：
+
+- **默认 Agent**：保持默认配置即可，能防止大多数重复调用和上下文膨胀。
+- **研究/检索 Agent**：适当提高 `MaxToolCalls`、`MaxTranscriptCharacters`，保留更多探索空间。
+- **生产执行 Agent**：设置明确的 `MaxToolCalls`，并保持 `MaxConsecutiveIdenticalToolCalls = 1`，避免不可控重复执行。
+- **高风险工具**：在 Skill/Dispatcher 层继续做权限与幂等控制；Loop Engineering 是循环治理，不替代工具级安全校验。
 
 ```json
 {
