@@ -142,6 +142,17 @@ npm run dev
 
 Vite dev-server 已配置反向代理：`/api` 和 `/hubs` 自动转发到 5050。
 
+### 4.1 启动 WorkPartner 桌面壳
+
+```bash
+cd src/QianYuan.Desktop
+npm install
+npm run dev
+```
+
+Electron 主进程会启动本地 `QianYuan.Api`，并打开现有 WebUI。开发模式默认读取
+`http://127.0.0.1:5173`，详细说明见 [docs/WORKPARTNER_DESKTOP.md](docs/WORKPARTNER_DESKTOP.md)。
+
 ### 5. 跑控制台样例
 
 ```bash

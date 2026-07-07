@@ -4,16 +4,132 @@ import type {
   ProvidersResponse, SessionSummaryDto, KnowledgeDocument, KnowledgeSearchResult,
   AgentStoreAgentDto, CreateAgentStoreAgentRequest, AddAgentSkillRequest,
   AddAgentMcpServerRequest, AddAgentCliServiceRequest, AgentStoreToolDto,
-  AgentInteractChunk,
+  AgentInteractChunk, AuthResponse, AuthUserDto, LoginRequest, RegisterRequest,
+  CreditWalletDto, CreditTransactionDto, SubscriptionPlanDto, EstimateCreditsRequest, EstimateCreditsResponse,
+  CreateWorkTaskRequest, WorkTaskDetailDto, WorkTaskDto, WorkArtifactDto,
+  ExpertTeamDto,
 } from '../types/api'
 
-const API = '/api'
+const API_ROOT = globalThis.window?.workpartner?.apiBaseUrl?.replace(/\/$/, '')
+const API = API_ROOT ? `${API_ROOT}/api` : '/api'
+const AUTH_STORAGE_KEY = 'workpartner.auth'
+
+export function getStoredAuth(): AuthResponse | null {
+  const raw = localStorage.getItem(AUTH_STORAGE_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as AuthResponse
+  } catch {
+    localStorage.removeItem(AUTH_STORAGE_KEY)
+    return null
+  }
+}
+
+export function storeAuth(auth: AuthResponse) {
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth))
+}
+
+export function clearAuth() {
+  localStorage.removeItem(AUTH_STORAGE_KEY)
+}
+
+function withAuthHeaders(headers?: HeadersInit): HeadersInit {
+  const auth = getStoredAuth()
+  const next = new Headers(headers)
+  if (auth?.accessToken) next.set('Authorization', `Bearer ${auth.accessToken}`)
+  return next
+}
+
+async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}) {
+  return fetch(input, { ...init, headers: withAuthHeaders(init.headers) })
+}
+
+export async function register(req: RegisterRequest): Promise<AuthResponse> {
+  const auth = await readJsonOrThrow<AuthResponse>(await fetch(`${API}/auth/register`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+  storeAuth(auth)
+  return auth
+}
+
+export async function login(req: LoginRequest): Promise<AuthResponse> {
+  const auth = await readJsonOrThrow<AuthResponse>(await fetch(`${API}/auth/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+  storeAuth(auth)
+  return auth
+}
+
+export async function logout() {
+  const auth = getStoredAuth()
+  clearAuth()
+  if (!auth?.refreshToken) return
+  await fetch(`${API}/auth/logout`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: auth.refreshToken }),
+  }).catch(() => undefined)
+}
+
+export async function getMe(): Promise<AuthUserDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/account/me`))
+}
+
+export async function getCreditWallet(): Promise<CreditWalletDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/credits/wallet`))
+}
+
+export async function listCreditTransactions(take = 30): Promise<CreditTransactionDto[]> {
+  return readJsonOrThrow(await apiFetch(`${API}/credits/transactions?take=${take}`))
+}
+
+export async function listPlans(): Promise<SubscriptionPlanDto[]> {
+  return readJsonOrThrow(await fetch(`${API}/plans`))
+}
+
+export async function estimateCredits(req: EstimateCreditsRequest): Promise<EstimateCreditsResponse> {
+  return readJsonOrThrow(await apiFetch(`${API}/credits/estimate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+
+export async function createWorkTask(req: CreateWorkTaskRequest): Promise<WorkTaskDetailDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/work-tasks`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+
+export async function listWorkTasks(take = 50): Promise<WorkTaskDto[]> {
+  return readJsonOrThrow(await apiFetch(`${API}/work-tasks?take=${take}`))
+}
+
+export async function getWorkTask(id: string): Promise<WorkTaskDetailDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/work-tasks/${encodeURIComponent(id)}`))
+}
+
+export async function listWorkArtifacts(taskId: string): Promise<WorkArtifactDto[]> {
+  return readJsonOrThrow(await apiFetch(`${API}/work-tasks/${encodeURIComponent(taskId)}/artifacts`))
+}
+
+export async function listExpertTeams(): Promise<ExpertTeamDto[]> {
+  return readJsonOrThrow(await apiFetch(`${API}/expert-teams`))
+}
+
+export async function orchestrateWorkTask(taskId: string, teamId?: string | null): Promise<WorkTaskDetailDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/work-tasks/${encodeURIComponent(taskId)}/orchestrate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teamId: teamId || null }),
+  }))
+}
+
+export async function executeWorkTask(taskId: string, teamId?: string | null, maxIterations = 8, timeoutSeconds = 90): Promise<WorkTaskDetailDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/work-tasks/${encodeURIComponent(taskId)}/execute`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teamId: teamId || null, maxIterations, timeoutSeconds }),
+  }))
+}
 
 export async function listAgents(): Promise<AgentDto[]> {
-  const r = await fetch(`${API}/agents`); return r.json()
+  const r = await apiFetch(`${API}/agents`); return r.json()
 }
 export async function listSkills(): Promise<SkillManifestDto[]> {
-  const r = await fetch(`${API}/skills`); return r.json()
+  const r = await apiFetch(`${API}/skills`); return r.json()
 }
 export async function listSkillTools(skillId: string): Promise<SkillToolsResponse | null> {
   const r = await fetch(`${API}/skills/${encodeURIComponent(skillId)}/tools`)
@@ -184,7 +300,7 @@ export async function deleteKnowledge(id: string) {
  * typed ChunkDto values. The caller controls cancellation via AbortSignal.
  */
 export async function* streamChat(req: StreamRequest, signal: AbortSignal): AsyncGenerator<ChunkDto> {
-  const resp = await fetch(`${API}/chat/stream`, {
+  const resp = await apiFetch(`${API}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
     body: JSON.stringify(req),

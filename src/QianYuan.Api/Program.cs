@@ -1,4 +1,7 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.IdentityModel.Tokens;
 using QianYuan.Api.Configuration;
 using QianYuan.Api.Hubs;
 using QianYuan.Api.Services;
@@ -21,16 +24,39 @@ using QianYuan.Skills.Builtin.Code;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<QianYuanApiOptions>(builder.Configuration.GetSection("QianYuan"));
+builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
 var qy = builder.Configuration.GetSection("QianYuan").Get<QianYuanApiOptions>() ?? new();
+var authOptions = builder.Configuration.GetSection("Auth").Get<AuthOptions>() ?? new();
 
 // --- Database and encryption ---
 var dbConnectionString = builder.Configuration.GetConnectionString("QianYuanDb") 
     ?? "DataSource=qianyuan.db";
+var dbProvider = builder.Configuration["Database:Provider"];
 var encryptionKey = builder.Configuration["QianYuan:EncryptionKey"] 
     ?? AesEncryptionService.GenerateEncryptionKey();
-builder.Services.AddQianYuanData(dbConnectionString, encryptionKey);
+builder.Services.AddQianYuanData(dbConnectionString, encryptionKey, dbProvider);
 builder.Services.AddScoped<IAgentManagementService, AgentManagementService>();
 builder.Services.AddScoped<IAgentExecutionService, AgentExecutionService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<ICreditService, CreditService>();
+builder.Services.AddScoped<IWorkTaskService, WorkTaskService>();
+builder.Services.AddScoped<IExpertTeamService, ExpertTeamService>();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateIssuerSigningKey = true,
+            ValidateLifetime = true,
+            ValidIssuer = authOptions.Issuer,
+            ValidAudience = authOptions.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authOptions.SigningKey)),
+            ClockSkew = TimeSpan.FromMinutes(1),
+        };
+    });
+builder.Services.AddAuthorization();
 
 // --- core kernel ---
 builder.Services.AddQianYuanKernel();
@@ -235,6 +261,8 @@ app.Services.RegisterAgentsFromServices();
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto });
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseSwagger();
 app.UseSwaggerUI();
 app.MapControllers();

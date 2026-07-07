@@ -9,6 +9,8 @@ obj/
 src/QianYuan.Web/node_modules/
 src/QianYuan.Web/dist/
 src/QianYuan.Web/.vite/
+src/QianYuan.Desktop/node_modules/
+src/QianYuan.Desktop/.npm-cache/
 
 # Runtime sandboxes
 _sandbox/

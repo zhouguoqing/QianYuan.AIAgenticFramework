@@ -146,6 +146,141 @@ export interface AgentStoreToolDto {
 }
 export interface AgentInteractChunk { type: 'text' | 'error'; content: string }
 
+export interface AuthUserDto {
+  id: string
+  email: string
+  displayName: string
+  status: string
+}
+
+export interface AuthResponse {
+  accessToken: string
+  refreshToken: string
+  expiresAt: string
+  user: AuthUserDto
+}
+
+export interface LoginRequest { email: string; password: string }
+export interface RegisterRequest { email: string; password: string; displayName?: string }
+
+export interface CreditWalletDto {
+  userId: string
+  balance: number
+  monthlyQuota: number
+  quotaMonth: string
+  planId: string
+  planName: string
+  updatedAt: string
+}
+
+export interface CreditTransactionDto {
+  id: string
+  type: string
+  amount: number
+  balanceAfter: number
+  sourceType: string
+  sourceId?: string | null
+  description?: string | null
+  createdAt: string
+}
+
+export interface SubscriptionPlanDto {
+  id: string
+  name: string
+  monthlyCredits: number
+  maxAssistants: number
+  maxProjects: number
+  maxAutoTasks: number
+  allowAllModels: boolean
+  priceMonthlyCents: number
+}
+
+export interface EstimateCreditsRequest {
+  inputTokens: number
+  outputTokens: number
+  modelTier?: string | null
+  taskType?: string | null
+}
+
+export interface EstimateCreditsResponse {
+  estimatedCredits: number
+  multiplier: number
+  formula: string
+}
+
+export interface CreateWorkTaskRequest {
+  title: string
+  goal: string
+  teamId?: string | null
+  providerId?: string | null
+  model?: string | null
+}
+
+export interface WorkTaskDto {
+  id: string
+  title: string
+  goal: string
+  status: string
+  teamId?: string | null
+  providerId?: string | null
+  model?: string | null
+  createdAt: string
+  updatedAt: string
+  stepCount: number
+  artifactCount: number
+}
+
+export interface WorkStepDto {
+  id: string
+  stepOrder: number
+  name: string
+  status: string
+  agentId?: string | null
+  summary?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WorkArtifactDto {
+  id: string
+  taskId: string
+  name: string
+  contentType: string
+  storageKind: string
+  content?: string | null
+  filePath?: string | null
+  sizeBytes: number
+  createdAt: string
+}
+
+export interface WorkTaskDetailDto {
+  task: WorkTaskDto
+  steps: WorkStepDto[]
+  artifacts: WorkArtifactDto[]
+}
+
+export interface ExpertTeamMemberDto {
+  id: string
+  memberOrder: number
+  roleId: string
+  displayName: string
+  agentId: string
+  responsibility: string
+  executionMode: string
+  enabled: boolean
+}
+
+export interface ExpertTeamDto {
+  id: string
+  name: string
+  description: string
+  scenario: string
+  enabled: boolean
+  createdAt: string
+  updatedAt: string
+  members: ExpertTeamMemberDto[]
+}
+
 // Knowledge base types
 export interface KnowledgeDocument {
   id: string; title: string; content: string; tags: string[]; createdAt: string;
