@@ -58,6 +58,26 @@ public sealed class KnowledgeController : ControllerBase
         return Ok(new { documents = docs });
     }
 
+    [HttpPost("parse-file")]
+    public async Task<IActionResult> ParseFile([FromForm] IFormFile file, [FromForm] string? title, [FromForm] string? tags, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0) return BadRequest(new { error = "file required" });
+
+        var tagList = string.IsNullOrWhiteSpace(tags)
+            ? Array.Empty<string>()
+            : tags.Split(',').Select(t => t.Trim()).Where(t => t.Length > 0).ToArray();
+
+        await using var stream = file.OpenReadStream();
+        var docs = await _parser.ParseAsync(
+            stream,
+            file.FileName,
+            string.IsNullOrWhiteSpace(title) ? Path.GetFileNameWithoutExtension(file.FileName) : title,
+            tagList,
+            ct).ConfigureAwait(false);
+
+        return Ok(new { documents = docs });
+    }
+
     [HttpGet("search")]
     public async Task<IActionResult> Search([FromQuery] string q, [FromQuery] int topK = 5, [FromQuery] bool answer = false, [FromQuery] string? provider = null, CancellationToken ct = default)
     {

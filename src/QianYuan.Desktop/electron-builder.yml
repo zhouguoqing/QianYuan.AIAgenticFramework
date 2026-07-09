@@ -10,6 +10,10 @@ extraResources:
     to: web
     filter:
       - "**/*"
+  - from: ../../.agents/skills
+    to: .agents/skills
+    filter:
+      - "**/*"
 mac:
   category: public.app-category.productivity
   target:

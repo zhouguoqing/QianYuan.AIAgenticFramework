@@ -27,4 +27,7 @@
     <PackageReference Include="UglyToad.PdfPig" Version="1.7.0-custom-5" />
     <PackageReference Include="Npgsql" Version="10.0.0" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Update="Data\experts\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

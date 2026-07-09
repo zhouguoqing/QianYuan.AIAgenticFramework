@@ -45,14 +45,16 @@ public sealed class SkillManager : ISkillManager
 
     public void Register(ISkill skill)
     {
-        var manifest = new SkillManifest(
-            skill.Id,
-            skill.Name,
-            skill.Description,
-            skill.Tags,
-            ApproximateToolCount: 0,
-            RequiresNetwork: false,
-            RequiresFilesystem: false);
+        var manifest = skill is MarkdownSkill markdown
+            ? MarkdownSkillLoader.BuildManifest(markdown)
+            : new SkillManifest(
+                skill.Id,
+                skill.Name,
+                skill.Description,
+                skill.Tags,
+                ApproximateToolCount: 0,
+                RequiresNetwork: false,
+                RequiresFilesystem: false);
 
         lock (_gate)
         {

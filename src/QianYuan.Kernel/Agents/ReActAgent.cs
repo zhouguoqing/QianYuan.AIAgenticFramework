@@ -82,7 +82,7 @@ public sealed class ReActAgent : IAgent
             Services = _services,
             Dispatcher = dispatcher,
             SelfAgentId = Id,
-            SystemPrompt = _def.SystemPrompt,
+            SystemPrompt = string.IsNullOrWhiteSpace(request.SystemPromptOverride) ? _def.SystemPrompt : request.SystemPromptOverride,
             PreloadSkills = request.PreloadSkills ?? _def.PreloadSkills,
             MaxIterations = request.MaxIterations ?? _def.MaxIterations,
             Metadata = request.Metadata,

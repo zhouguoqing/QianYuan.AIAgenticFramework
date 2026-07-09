@@ -41,6 +41,8 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICreditService, CreditService>();
 builder.Services.AddScoped<IWorkTaskService, WorkTaskService>();
 builder.Services.AddScoped<IExpertTeamService, ExpertTeamService>();
+builder.Services.AddSingleton<IExpertCatalogService, ExpertCatalogService>();
+builder.Services.AddHttpClient();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -251,7 +253,7 @@ app.Services.RegisterProvidersFromServices(qy.DefaultProviderId);
 app.Services.RegisterSkillsFromServices();
 app.Services.RegisterMarkdownSkillsFromDirectories(qy.SkillDirectories.Select(d => new MarkdownSkillDirectoryOptions
 {
-    Path = d.Path,
+    Path = ResolveSkillDirectory(d.Path, builder.Environment.ContentRootPath),
     Recursive = d.Recursive,
     Enabled = d.Enabled,
     IdPrefix = d.IdPrefix,
@@ -287,3 +289,31 @@ app.MapGet("/", () => Results.Ok(new
 }));
 
 app.Run();
+
+static string ResolveSkillDirectory(string configuredPath, string contentRootPath)
+{
+    var expanded = Environment.ExpandEnvironmentVariables(configuredPath);
+    if (Path.IsPathRooted(expanded)) return Path.GetFullPath(expanded);
+
+    foreach (var basePath in CandidateBasePaths(contentRootPath))
+    {
+        var candidate = Path.GetFullPath(Path.Combine(basePath, expanded));
+        if (Directory.Exists(candidate)) return candidate;
+    }
+
+    return Path.GetFullPath(expanded);
+}
+
+static IEnumerable<string> CandidateBasePaths(string contentRootPath)
+{
+    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var root in new[] { Directory.GetCurrentDirectory(), contentRootPath, AppContext.BaseDirectory })
+    {
+        var current = root;
+        while (!string.IsNullOrWhiteSpace(current) && seen.Add(current))
+        {
+            yield return current;
+            current = Directory.GetParent(current)?.FullName;
+        }
+    }
+}

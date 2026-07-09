@@ -1,4 +1,5 @@
 export type ChunkKind =
+  | 'Session' | 'Runtime' | 'Done'
   | 'Start' | 'TextDelta' | 'ThinkingDelta'
   | 'ToolCallStart' | 'ToolCallArgsDelta' | 'ToolCallEnd' | 'ToolObservation'
   | 'Usage' | 'End' | 'Warning' | 'Error'
@@ -14,10 +15,13 @@ export interface ChunkDto {
   agentId?: string | null
   skillId?: string | null
   step?: number | null
+  sessionId?: string | null
+  provider?: string | null
+  modelSource?: string | null
   usage?: { input: number; output: number; cacheRead?: number; cacheWrite?: number } | null
 }
 
-export interface ImagePart { url?: string; base64?: string; mime?: string }
+export interface ImagePart { url?: string; base64?: string; mime?: string; name?: string; size?: number }
 
 export type ComposerMode = 'chat' | 'text-to-image' | 'image-to-image'
 
@@ -31,6 +35,7 @@ export interface StreamRequest {
   model?: string
   skills?: string[]
   maxIterations?: number
+  systemPrompt?: string
 }
 
 export interface ImageGenerationRequest {
@@ -279,6 +284,53 @@ export interface ExpertTeamDto {
   createdAt: string
   updatedAt: string
   members: ExpertTeamMemberDto[]
+}
+
+// Expert marketplace (WorkBuddy-style catalog)
+export interface ExpertCategoryDto {
+  id: string
+  name: string
+  description: string
+  count: number
+}
+
+export interface ExpertSummaryDto {
+  id: string
+  categoryId: string
+  categoryName: string
+  name: string
+  profession: string
+  description: string
+  avatarUrl: string
+  type: string
+  isOpc: boolean
+  tags: string[]
+  author?: string | null
+}
+
+export interface ExpertDetailDto extends ExpertSummaryDto {
+  agentName: string
+  plugin: string
+  defaultInitPrompt: string
+  quickPrompts: string[]
+}
+
+export interface ExpertScenarioDto {
+  id: string
+  name: string
+  description: string
+  accent: string
+  experts: ExpertSummaryDto[]
+}
+
+export interface ExpertListResultDto {
+  total: number
+  items: ExpertSummaryDto[]
+}
+
+export interface ExpertPromptDto {
+  id: string
+  systemPrompt: string
 }
 
 // Knowledge base types

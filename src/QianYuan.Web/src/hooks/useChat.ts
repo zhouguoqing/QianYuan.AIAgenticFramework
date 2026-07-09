@@ -9,6 +9,7 @@ interface UseChatOptions {
   model: string | null
   skills: string[]
   sessionId: string | null
+  systemPrompt?: string | null
   onSession: (id: string) => void
 }
 
@@ -25,11 +26,20 @@ export function useChat(opts: UseChatOptions) {
   useEffect(() => { setMessages([]) }, [opts.sessionId])
 
   const abort = useCallback(() => { abortRef.current?.abort(); abortRef.current = null; setBusy(false) }, [])
+  const reset = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    setBusy(false)
+    setMessages([])
+  }, [])
 
   const send = useCallback(async (text: string, images: ImagePart[], mode: ComposerMode = 'chat') => {
     const userMsg: DisplayMessage = {
       id: cryptoId(), kind: 'user', text: mode === 'chat' ? text : `${mode === 'text-to-image' ? '文生图' : '图生图'}：${text}`,
       imageUrls: images.map(i => i.url ?? '').filter(Boolean),
+      createdAt: new Date().toISOString(),
+      model: opts.model ?? 'Auto',
+      agentId: opts.agentId ?? undefined,
     }
     setMessages(prev => [...prev, userMsg])
 
@@ -46,6 +56,7 @@ export function useChat(opts: UseChatOptions) {
       skills: opts.skills.length > 0 ? opts.skills : undefined,
       userText: text,
       images: images.length > 0 ? images : undefined,
+      systemPrompt: opts.systemPrompt ?? undefined,
     }
 
     const ctrl = new AbortController()
@@ -55,6 +66,7 @@ export function useChat(opts: UseChatOptions) {
     // Track current assistant streaming message id; tool & observation use their own.
     let assistantId: string | null = null
     let toolStreamIds: Record<string, string> = {}
+    let runtime: { provider?: string | null; model?: string | null; modelSource?: string | null } = {}
 
     try {
       for await (const chunk of streamChat(req, ctrl.signal)) {
@@ -107,19 +119,49 @@ export function useChat(opts: UseChatOptions) {
 
     function applyChunk(c: ChunkDto) {
       switch (c.kind) {
+        case 'Session':
+          if (c.sessionId) opts.onSession(c.sessionId)
+          break
+
+        case 'Runtime':
+          runtime = { provider: c.provider, model: c.model, modelSource: c.modelSource }
+          break
+
         case 'Start':
           assistantId = cryptoId()
-          setMessages(prev => [...prev, { id: assistantId!, kind: 'assistant', text: '', streaming: true }])
+          setMessages(prev => [...prev, {
+            id: assistantId!, kind: 'assistant', text: '', streaming: true,
+            createdAt: new Date().toISOString(),
+            model: c.model ?? runtime.model ?? opts.model ?? undefined,
+            provider: runtime.provider ?? opts.provider ?? undefined,
+            modelSource: runtime.modelSource ?? 'cloud',
+            agentId: c.agentId ?? opts.agentId ?? undefined,
+            step: c.step ?? undefined,
+          }])
           break
 
         case 'TextDelta':
           if (!c.text) return
           if (!assistantId) {
             assistantId = cryptoId()
-            setMessages(prev => [...prev, { id: assistantId!, kind: 'assistant', text: c.text!, streaming: true }])
+            setMessages(prev => [...prev, {
+              id: assistantId!, kind: 'assistant', text: c.text!, streaming: true,
+              createdAt: new Date().toISOString(),
+              model: c.model ?? runtime.model ?? opts.model ?? undefined,
+              provider: runtime.provider ?? opts.provider ?? undefined,
+              modelSource: runtime.modelSource ?? 'cloud',
+              agentId: c.agentId ?? opts.agentId ?? undefined,
+              step: c.step ?? undefined,
+            }])
           } else {
             const id = assistantId
-            setMessages(prev => prev.map(m => m.id === id ? { ...m, text: m.text + c.text } : m))
+            setMessages(prev => prev.map(m => m.id === id ? {
+              ...m,
+              text: m.text + c.text,
+              model: c.model ?? m.model,
+              agentId: c.agentId ?? m.agentId,
+              step: c.step ?? m.step,
+            } : m))
           }
           break
 
@@ -130,7 +172,15 @@ export function useChat(opts: UseChatOptions) {
             if (last && last.kind === 'thinking' && last.streaming) {
               return prev.map((m, i) => i === prev.length - 1 ? { ...m, text: m.text + c.text } : m)
             }
-            return [...prev, { id: cryptoId(), kind: 'thinking', text: c.text!, streaming: true }]
+            return [...prev, {
+              id: cryptoId(), kind: 'thinking', text: c.text!, streaming: true,
+              createdAt: new Date().toISOString(),
+              model: c.model ?? runtime.model ?? undefined,
+              provider: runtime.provider ?? undefined,
+              modelSource: runtime.modelSource ?? 'cloud',
+              agentId: c.agentId ?? opts.agentId ?? undefined,
+              step: c.step ?? undefined,
+            }]
           })
           break
 
@@ -145,6 +195,9 @@ export function useChat(opts: UseChatOptions) {
             toolName: c.toolName ?? undefined,
             text: c.toolArgsJson ?? '',
             streaming: true,
+            createdAt: new Date().toISOString(),
+            skillId: c.skillId ?? undefined,
+            step: c.step ?? undefined,
           }])
           break
         }
@@ -168,20 +221,36 @@ export function useChat(opts: UseChatOptions) {
             kind: 'observation',
             toolName: c.toolName ?? undefined,
             text: c.text ?? '',
+            createdAt: new Date().toISOString(),
+            skillId: c.skillId ?? undefined,
+            step: c.step ?? undefined,
           }])
           break
         }
         case 'Warning':
-          setMessages(prev => [...prev, { id: cryptoId(), kind: 'warning', text: c.text ?? '' }]); break
+          setMessages(prev => [...prev, { id: cryptoId(), kind: 'warning', text: c.text ?? '', createdAt: new Date().toISOString() }]); break
         case 'Error':
-          setMessages(prev => [...prev, { id: cryptoId(), kind: 'error', text: c.text ?? '' }]); break
-        case 'End': /* finalized in finally */ break
-        case 'Usage': /* could surface a small footer here */ break
+          setMessages(prev => [...prev, { id: cryptoId(), kind: 'error', text: c.text ?? '', createdAt: new Date().toISOString() }]); break
+        case 'End':
+          if (assistantId) {
+            const id = assistantId
+            setMessages(prev => prev.map(m => m.id === id ? { ...m, streaming: false, usage: c.usage ?? m.usage } : m))
+          }
+          break
+        case 'Usage':
+          if (assistantId && c.usage) {
+            const id = assistantId
+            setMessages(prev => prev.map(m => m.id === id ? { ...m, usage: c.usage ?? m.usage } : m))
+          }
+          break
+        case 'Done':
+          if (c.sessionId) opts.onSession(c.sessionId)
+          break
       }
     }
   }, [opts.agentId, opts.provider, opts.model, opts.skills, opts.sessionId, opts.onSession])
 
-  return { messages, busy, send, abort, setMessages }
+  return { messages, busy, send, abort, reset }
 }
 
 function cryptoId(): string {

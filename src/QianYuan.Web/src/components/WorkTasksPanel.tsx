@@ -92,7 +92,10 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
     <div className="modal-backdrop">
       <div className="modal worktask-modal">
         <div className="modal-header">
-          <strong>任务工作台</strong>
+          <div className="workbench-title">
+            <strong>AI 专家团工作台</strong>
+            <span>创建任务、编排专家、沉淀产物</span>
+          </div>
           <span style={{ flex: 1 }} />
           <button className="ghost" onClick={onClose}>关闭</button>
         </div>

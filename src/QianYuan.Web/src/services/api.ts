@@ -8,6 +8,7 @@ import type {
   CreditWalletDto, CreditTransactionDto, SubscriptionPlanDto, EstimateCreditsRequest, EstimateCreditsResponse,
   CreateWorkTaskRequest, WorkTaskDetailDto, WorkTaskDto, WorkArtifactDto,
   ExpertTeamDto,
+  ExpertCategoryDto, ExpertScenarioDto, ExpertListResultDto, ExpertDetailDto, ExpertPromptDto,
 } from '../types/api'
 
 const API_ROOT = globalThis.window?.workpartner?.apiBaseUrl?.replace(/\/$/, '')
@@ -111,6 +112,32 @@ export async function listWorkArtifacts(taskId: string): Promise<WorkArtifactDto
 
 export async function listExpertTeams(): Promise<ExpertTeamDto[]> {
   return readJsonOrThrow(await apiFetch(`${API}/expert-teams`))
+}
+
+export async function listExpertCategories(): Promise<ExpertCategoryDto[]> {
+  return readJsonOrThrow(await fetch(`${API}/experts/categories`))
+}
+
+export async function listExpertScenarios(): Promise<ExpertScenarioDto[]> {
+  return readJsonOrThrow(await fetch(`${API}/experts/scenarios`))
+}
+
+export async function listExperts(params: { category?: string; type?: string; q?: string; sort?: string } = {}): Promise<ExpertListResultDto> {
+  const search = new URLSearchParams()
+  if (params.category) search.set('category', params.category)
+  if (params.type) search.set('type', params.type)
+  if (params.q) search.set('q', params.q)
+  if (params.sort) search.set('sort', params.sort)
+  const qs = search.toString()
+  return readJsonOrThrow(await fetch(`${API}/experts${qs ? `?${qs}` : ''}`))
+}
+
+export async function getExpert(id: string): Promise<ExpertDetailDto> {
+  return readJsonOrThrow(await fetch(`${API}/experts/${encodeURIComponent(id)}`))
+}
+
+export async function getExpertPrompt(id: string): Promise<ExpertPromptDto> {
+  return readJsonOrThrow(await fetch(`${API}/experts/${encodeURIComponent(id)}/prompt`))
 }
 
 export async function orchestrateWorkTask(taskId: string, teamId?: string | null): Promise<WorkTaskDetailDto> {
@@ -278,6 +305,13 @@ export async function uploadKnowledgeFile(body: FormData) {
   if (!r.ok) throw new Error(await r.text())
   return r.json()
 }
+export async function parseKnowledgeFile(body: FormData) {
+  const r = await fetch(`${API}/knowledge/parse-file`, {
+    method: 'POST', body,
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() as Promise<{ documents: Array<{ title: string; content: string; tags?: string[] }> }>
+}
 export async function searchKnowledge(q: string, topK = 5, answer = false, provider?: string): Promise<KnowledgeSearchResult> {
   const params = new URLSearchParams({ q, topK: String(topK), answer: String(answer) })
   if (provider) params.set('provider', provider)
@@ -339,10 +373,11 @@ function parseSseEvent(raw: string): ChunkDto | null {
   if (dataLines.length === 0) return null
   const dataStr = dataLines.join('\n')
   try {
-    // Envelope events carry metadata only — the real Start/End chunks come on their own.
-    if (eventName === 'session' || eventName === 'done') return null
-    const obj = JSON.parse(dataStr) as ChunkDto
-    if (eventName === 'error') return { kind: 'Error', text: (obj as any).message ?? 'error' }
+    const obj = JSON.parse(dataStr) as ChunkDto & { message?: string }
+    if (eventName === 'session') return { kind: 'Session', sessionId: obj.sessionId, agentId: obj.agentId }
+    if (eventName === 'runtime') return { kind: 'Runtime', provider: obj.provider, model: obj.model, modelSource: obj.modelSource }
+    if (eventName === 'done') return { kind: 'Done', sessionId: obj.sessionId }
+    if (eventName === 'error') return { kind: 'Error', text: obj.message ?? 'error' }
     return obj
   } catch {
     return null

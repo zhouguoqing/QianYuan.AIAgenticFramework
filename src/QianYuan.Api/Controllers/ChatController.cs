@@ -13,14 +13,15 @@ namespace QianYuan.Api.Controllers;
 public sealed class ChatController : ControllerBase
 {
     private readonly IAgentRegistry _agents;
+    private readonly ILlmProviderRegistry _providers;
     private readonly ISessionStore _sessions;
     private readonly ILogger<ChatController> _logger;
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
-    public ChatController(IAgentRegistry agents, ISessionStore sessions, ILogger<ChatController> logger)
+    public ChatController(IAgentRegistry agents, ILlmProviderRegistry providers, ISessionStore sessions, ILogger<ChatController> logger)
     {
-        _agents = agents; _sessions = sessions; _logger = logger;
+        _agents = agents; _providers = providers; _sessions = sessions; _logger = logger;
     }
 
     /// <summary>SSE streaming chat. Each event has a "kind" and a payload matching <see cref="StreamingChunk"/>.</summary>
@@ -53,15 +54,32 @@ public sealed class ChatController : ControllerBase
         var assistantText = new System.Text.StringBuilder();
         await WriteSse("session", new { sessionId, agentId = agent.Id }, ct);
 
+        var providerOverride = NormalizeAuto(req.Provider);
+        var modelOverride = NormalizeAuto(req.Model);
+        var resolvedProvider = providerOverride is null ? _providers.Default : _providers.Get(providerOverride);
+        if (resolvedProvider is null)
+        {
+            await WriteSse("error", new { message = $"云端大模型服务 '{providerOverride}' 未注册或未启用。" }, ct);
+            return;
+        }
+
+        await WriteSse("runtime", new
+        {
+            modelSource = "cloud",
+            provider = resolvedProvider.ProviderId,
+            model = modelOverride ?? resolvedProvider.DefaultModel,
+        }, ct);
+
         var run = new AgentRunRequest
         {
             Messages = messages,
             SessionId = sessionId,
-            ModelOverride = req.Model,
-            ProviderOverride = req.Provider,
+            ModelOverride = modelOverride,
+            ProviderOverride = providerOverride,
+            SystemPromptOverride = string.IsNullOrWhiteSpace(req.SystemPrompt) ? null : req.SystemPrompt,
             PreloadSkills = req.Skills,
             MaxIterations = req.MaxIterations,
-            Metadata = req.OwnerId is null ? null : new Dictionary<string, string> { ["ownerId"] = req.OwnerId },
+            Metadata = BuildMetadata(req.OwnerId, resolvedProvider.ProviderId, modelOverride ?? resolvedProvider.DefaultModel),
         };
 
         try
@@ -148,6 +166,23 @@ public sealed class ChatController : ControllerBase
     };
 
     private static string Snippet(string s, int n) => s.Length <= n ? s : s[..n] + "...";
+
+    private static string? NormalizeAuto(string? value)
+        => string.IsNullOrWhiteSpace(value) || string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : value.Trim();
+
+    private static Dictionary<string, string> BuildMetadata(string? ownerId, string providerId, string model)
+    {
+        var metadata = new Dictionary<string, string>
+        {
+            ["modelSource"] = "cloud",
+            ["provider"] = providerId,
+            ["model"] = model,
+        };
+        if (!string.IsNullOrWhiteSpace(ownerId)) metadata["ownerId"] = ownerId;
+        return metadata;
+    }
 }
 
 public sealed class ChatStreamRequest
@@ -161,6 +196,7 @@ public sealed class ChatStreamRequest
     public string? Model { get; set; }
     public string[]? Skills { get; set; }
     public int? MaxIterations { get; set; }
+    public string? SystemPrompt { get; set; }
 }
 
 public sealed class ImagePart

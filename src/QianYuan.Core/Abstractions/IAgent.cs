@@ -40,6 +40,9 @@ public sealed class AgentRunRequest
     /// <summary>Override the provider id (e.g. force "claude" for this turn).</summary>
     public string? ProviderOverride { get; init; }
 
+    /// <summary>Override the agent's system prompt for this run (e.g. a summoned expert persona).</summary>
+    public string? SystemPromptOverride { get; init; }
+
     /// <summary>Skill ids the caller explicitly wants enabled this turn (progressive load hint).</summary>
     public IReadOnlyList<string>? PreloadSkills { get; init; }
 
