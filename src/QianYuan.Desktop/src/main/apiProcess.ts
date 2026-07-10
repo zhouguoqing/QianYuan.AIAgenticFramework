@@ -40,11 +40,15 @@ function attachLogging(child: ChildProcess): ChildProcess {
 }
 
 function buildSpawnOptions() {
+  const root = repoRoot()
   return {
-    cwd: repoRoot(),
+    cwd: root,
     env: {
       ...process.env,
       ASPNETCORE_ENVIRONMENT: process.env.ASPNETCORE_ENVIRONMENT ?? 'Production',
+      QianYuan__FileSystemSkill__SandboxDirectory: process.env.QianYuan__FileSystemSkill__SandboxDirectory ?? root,
+      QianYuan__FileSystemSkill__ReadOnly: process.env.QianYuan__FileSystemSkill__ReadOnly ?? 'false',
+      WORKPARTNER_WORKSPACE_ROOT: process.env.WORKPARTNER_WORKSPACE_ROOT ?? root,
     },
     stdio: 'pipe' as const,
   }

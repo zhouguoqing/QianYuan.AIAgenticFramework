@@ -20,6 +20,7 @@
 | Agent 注册 | `IAgentRegistry`，Agent 之间可互相调用 (`agent.<id>` 工具) |
 | Agent Store | 可视化创建、编辑、编排和测试企业智能体；支持挂载 Skill、MCP Server、CLI Service |
 | WebUI | React 19 + Vite + TS，SSE 流式渲染、Markdown、图片粘贴 |
+| Desktop | Electron 桌面壳，自动启动本地 Api，支持原生文件选择、本地工作区读写和桌面端调试 |
 | 钉钉 | 自定义机器人签名校验 + 分段 Markdown 卡片更新 |
 
 ## 项目结构
@@ -42,7 +43,8 @@ QianYuan.AgenticFramework/
 │   ├── QianYuan.UnifyCli/                # 统一 HTTPS 服务封装框架 (REST API → CLI → Skill)
 │   ├── QianYuan.Integrations.DingTalk/   # 钉钉 webhook 收发
 │   ├── QianYuan.Api/                     # ASP.NET Core 10 host (SSE + SignalR + Swagger + Agent Store API)
-│   └── QianYuan.Web/                     # React + Vite WebUI（含 Agent Store 管理界面）
+│   ├── QianYuan.Web/                     # React + Vite WebUI（含 Agent Store 管理界面）
+│   └── QianYuan.Desktop/                 # Electron Desktop 壳（preload IPC + 本地 Api/Web 调试）
 ├── samples/QianYuan.Sample.Console/
 └── tests/QianYuan.Core.Tests/            # xUnit + FluentAssertions
 ```
@@ -70,6 +72,17 @@ pwsh -File scripts\start.ps1 -Stop
 脚本会检测 `.NET 10 SDK` 与 `Node.js (>=18)`；缺 Node 时只起 Api。
 默认地址：Api `http://localhost:5050`（Swagger `/swagger`），WebUI `http://localhost:5173`。
 通过 `QIANYUAN_API_URL` / `QIANYUAN_WEB_URL` 环境变量可覆盖。
+
+桌面端调试可直接用快捷脚本启动 Web dev-server + Electron；Electron 主进程会自动启动本地 Api：
+
+```bash
+# macOS / Linux
+./scripts/desktop-dev.sh
+
+# Windows (cmd / PowerShell 任一)
+scripts\desktop-dev.cmd
+pwsh -File scripts\desktop-dev.ps1
+```
 
 ### 1. 编译
 
@@ -144,6 +157,14 @@ Vite dev-server 已配置反向代理：`/api` 和 `/hubs` 自动转发到 5050�
 
 ### 4.1 启动 WorkPartner 桌面壳
 
+推荐使用根目录快捷脚本，它会自动检查依赖、启动 Web dev-server，再打开 Electron：
+
+```bash
+./scripts/desktop-dev.sh
+```
+
+也可以手动启动：
+
 ```bash
 cd src/QianYuan.Desktop
 npm install
@@ -151,7 +172,12 @@ npm run dev
 ```
 
 Electron 主进程会启动本地 `QianYuan.Api`，并打开现有 WebUI。开发模式默认读取
-`http://127.0.0.1:5173`，详细说明见 [docs/WORKPARTNER_DESKTOP.md](docs/WORKPARTNER_DESKTOP.md)。
+`http://127.0.0.1:5173`；需要指定前端地址时设置 `WORKPARTNER_RENDERER_URL`。
+
+桌面层通过 preload 暴露 `window.workpartner`：包含运行时信息、Api 地址和受控本地文件系统 API。
+默认允许访问当前项目、桌面、文档目录；其他目录需要通过原生目录选择器显式授权。桌面启动的 Api
+会把内置 FileSystem Skill 的沙箱根目录设为当前仓库根目录，便于 Agent 像 Codex 一样读写本地工作区文件。
+详细说明见 [docs/WORKPARTNER_DESKTOP.md](docs/WORKPARTNER_DESKTOP.md)。
 
 ### 5. 跑控制台样例
 
