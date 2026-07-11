@@ -36,6 +36,17 @@ export interface StreamRequest {
   skills?: string[]
   maxIterations?: number
   systemPrompt?: string
+  workspaceId?: string
+  workspacePath?: string
+  workspaceLabel?: string
+  permission?: string
+}
+
+export interface WorkspaceContext {
+  workspaceId?: string
+  workspacePath?: string
+  workspaceLabel?: string
+  permission?: string
 }
 
 export interface ImageGenerationRequest {

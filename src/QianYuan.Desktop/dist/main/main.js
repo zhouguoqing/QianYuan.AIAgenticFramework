@@ -25,6 +25,9 @@ async function createWindow() {
             additionalArguments: [`--workpartner-api-url=${apiRuntime.url}`],
         },
     });
+    if (process.platform === 'darwin') {
+        win.setWindowButtonVisibility(false);
+    }
     win.webContents.setWindowOpenHandler(({ url }) => {
         void shell.openExternal(url);
         return { action: 'deny' };

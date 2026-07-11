@@ -9,7 +9,7 @@ import { CreditsPanel } from './components/CreditsPanel'
 import { WorkTasksPanel } from './components/WorkTasksPanel'
 import { AccountMenu } from './components/AccountMenu'
 import { useChat } from './hooks/useChat'
-import type { AuthResponse, ComposerMode, ImagePart, ExpertDetailDto } from './types/api'
+import type { AuthResponse, ComposerMode, ImagePart, ExpertDetailDto, WorkspaceContext } from './types/api'
 import { getExpertPrompt, getMe, getStoredAuth, logout, storeAuth } from './services/api'
 
 type ActiveExpert = { id: string; name: string; avatarUrl: string; profession: string; systemPrompt: string }
@@ -104,16 +104,16 @@ export default function App() {
 
   const hasMessages = messages.length > 0
 
-  function submitShortcut(text: string) {
-    const images: ImagePart[] = []
-    guardedSubmit(text, images, 'chat')
+  function seedShortcut(text: string) {
+    setView('chat')
+    setComposerSeed(s => ({ text, nonce: s.nonce + 1 }))
   }
 
-  function guardedSubmit(text: string, images: ImagePart[], mode: ComposerMode) {
+  function guardedSubmit(text: string, images: ImagePart[], mode: ComposerMode, workspace?: WorkspaceContext) {
     if (!requireAuth('登录或注册后即可使用云端大模型、保存会话，并进入 AI 专家团工作台。')) return
     // Clear any pending composer seed so the chat-view composer doesn't re-apply it on mount.
     setComposerSeed(s => (s.text ? { text: '', nonce: s.nonce } : s))
-    send(text, images, mode)
+    send(text, images, mode, workspace)
   }
 
   function openAccountMenu(placement: 'topbar' | 'sidebar') {
@@ -184,7 +184,7 @@ export default function App() {
           busy={busy}
           onSubmit={guardedSubmit}
           onAbort={abort}
-          onShortcut={submitShortcut}
+          onShortcut={seedShortcut}
           selectedAgent={agentId}
           onAgentChange={setAgentId}
           selectedProvider={provider}
@@ -238,7 +238,7 @@ export default function App() {
 
 interface HomeLandingProps {
   busy: boolean
-  onSubmit: (text: string, images: ImagePart[], mode: ComposerMode) => void
+  onSubmit: (text: string, images: ImagePart[], mode: ComposerMode, workspace?: WorkspaceContext) => void
   onAbort: () => void
   onShortcut: (text: string) => void
   selectedAgent: string | null
@@ -263,6 +263,8 @@ function HomeLanding({
   selectedSkills, onSkillsChange,
   activeExpert, onClearExpert, seedText, seedNonce,
 }: HomeLandingProps) {
+  const [activeModeLabel, setActiveModeLabel] = useState('代码开发')
+
   const workModes = [
     { label: '日常办公', prompt: '帮我整理今天的工作事项，并给出可执行的优先级计划。' },
     { label: '代码开发', prompt: '帮我分析这个代码需求，拆解实现步骤并指出风险点。' },
@@ -279,11 +281,16 @@ function HomeLanding({
     <main className="home-stage">
       <section className="home-hero">
         <div className="hero-copy">
-          <p className="hero-kicker">WorkPartner Desktop</p>
           <h1>AI WorkPartner<br />你的AI智能伙伴</h1>
           <div className="home-mode-tabs" aria-label="常用工作模式">
-            {workModes.map((item, index) => (
-              <button key={item.label} className={index === 0 ? 'active' : ''} onClick={() => onShortcut(item.prompt)}>
+            {workModes.map(item => (
+              <button
+                key={item.label}
+                className={item.label === activeModeLabel ? 'active' : ''}
+                onClick={() => {
+                  setActiveModeLabel(item.label)
+                  onShortcut(item.prompt)
+                }}>
                 {item.label}
               </button>
             ))}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ChunkDto, ComposerMode, ImagePart, StreamRequest } from '../types/api'
+import type { ChunkDto, ComposerMode, ImagePart, StreamRequest, WorkspaceContext } from '../types/api'
 import { generateImage, streamChat } from '../services/api'
 import type { DisplayMessage } from '../components/ChatMessageView'
 
@@ -33,7 +33,7 @@ export function useChat(opts: UseChatOptions) {
     setMessages([])
   }, [])
 
-  const send = useCallback(async (text: string, images: ImagePart[], mode: ComposerMode = 'chat') => {
+  const send = useCallback(async (text: string, images: ImagePart[], mode: ComposerMode = 'chat', workspace?: WorkspaceContext) => {
     const userMsg: DisplayMessage = {
       id: cryptoId(), kind: 'user', text: mode === 'chat' ? text : `${mode === 'text-to-image' ? '文生图' : '图生图'}：${text}`,
       imageUrls: images.map(i => i.url ?? '').filter(Boolean),
@@ -57,6 +57,10 @@ export function useChat(opts: UseChatOptions) {
       userText: text,
       images: images.length > 0 ? images : undefined,
       systemPrompt: opts.systemPrompt ?? undefined,
+      workspaceId: workspace?.workspaceId,
+      workspacePath: workspace?.workspacePath,
+      workspaceLabel: workspace?.workspaceLabel,
+      permission: workspace?.permission,
     }
 
     const ctrl = new AbortController()

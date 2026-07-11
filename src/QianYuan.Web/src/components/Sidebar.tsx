@@ -92,11 +92,6 @@ export function Sidebar(p: Props) {
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="window-dots"><span /><span /><span /></div>
-        <span>WorkPartner v0.1.0</span>
-      </div>
-
       <div className="sidebar-nav">
         {navItems.map(item => (
           <button key={item.label} className={`nav-item ${item.active ? 'active' : ''}`} onClick={item.action} type="button">

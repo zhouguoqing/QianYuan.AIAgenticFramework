@@ -79,7 +79,7 @@ public sealed class ChatController : ControllerBase
             SystemPromptOverride = string.IsNullOrWhiteSpace(req.SystemPrompt) ? null : req.SystemPrompt,
             PreloadSkills = req.Skills,
             MaxIterations = req.MaxIterations,
-            Metadata = BuildMetadata(req.OwnerId, resolvedProvider.ProviderId, modelOverride ?? resolvedProvider.DefaultModel),
+            Metadata = BuildMetadata(req, resolvedProvider.ProviderId, modelOverride ?? resolvedProvider.DefaultModel),
         };
 
         try
@@ -172,7 +172,7 @@ public sealed class ChatController : ControllerBase
             ? null
             : value.Trim();
 
-    private static Dictionary<string, string> BuildMetadata(string? ownerId, string providerId, string model)
+    private static Dictionary<string, string> BuildMetadata(ChatStreamRequest req, string providerId, string model)
     {
         var metadata = new Dictionary<string, string>
         {
@@ -180,7 +180,13 @@ public sealed class ChatController : ControllerBase
             ["provider"] = providerId,
             ["model"] = model,
         };
-        if (!string.IsNullOrWhiteSpace(ownerId)) metadata["ownerId"] = ownerId;
+
+        if (!string.IsNullOrWhiteSpace(req.OwnerId)) metadata["ownerId"] = req.OwnerId;
+        if (!string.IsNullOrWhiteSpace(req.WorkspaceId)) metadata["workspaceId"] = req.WorkspaceId;
+        if (!string.IsNullOrWhiteSpace(req.WorkspacePath)) metadata["workspacePath"] = req.WorkspacePath;
+        if (!string.IsNullOrWhiteSpace(req.WorkspaceLabel)) metadata["workspaceLabel"] = req.WorkspaceLabel;
+        if (!string.IsNullOrWhiteSpace(req.Permission)) metadata["permission"] = req.Permission;
+
         return metadata;
     }
 }
@@ -197,6 +203,10 @@ public sealed class ChatStreamRequest
     public string[]? Skills { get; set; }
     public int? MaxIterations { get; set; }
     public string? SystemPrompt { get; set; }
+    public string? WorkspaceId { get; set; }
+    public string? WorkspacePath { get; set; }
+    public string? WorkspaceLabel { get; set; }
+    public string? Permission { get; set; }
 }
 
 public sealed class ImagePart

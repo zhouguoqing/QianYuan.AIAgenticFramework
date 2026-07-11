@@ -30,6 +30,10 @@ async function createWindow() {
     },
   })
 
+  if (process.platform === 'darwin') {
+    win.setWindowButtonVisibility(false)
+  }
+
   win.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
     return { action: 'deny' }

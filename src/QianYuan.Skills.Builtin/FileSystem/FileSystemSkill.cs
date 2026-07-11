@@ -25,7 +25,8 @@ public sealed class FileSystemSkill : ISkill
     public string Name => "File System";
     public string Description => $"Read{(_readOnly ? "" : "/write")} files within {_rootFull}.";
     public IReadOnlyList<string> Tags => new[] { "file", "filesystem", "io", "read", "write" };
-    public string? SystemPromptFragment => $"Sandbox root: {_rootFull}. All paths are interpreted relative to it; absolute paths and traversal are rejected.";
+    public string? SystemPromptFragment =>
+        $"Sandbox root defaults to {_rootFull}. If runtime workspace context is provided, file operations use that workspace root instead. All tool paths are relative and traversal is rejected.";
 
     private ToolDefinition[] BuildTools()
     {
@@ -66,11 +67,11 @@ public sealed class FileSystemSkill : ISkill
         {
             return toolName switch
             {
-                "fs_read" => await ReadAsync(args, ct).ConfigureAwait(false),
-                "fs_list" => List(args),
+                "fs_read" => await ReadAsync(args, context, ct).ConfigureAwait(false),
+                "fs_list" => List(args, context),
                 "fs_write" => _readOnly
                     ? SkillInvocationResult.Error("filesystem is read-only")
-                    : await WriteAsync(args, ct).ConfigureAwait(false),
+                    : await WriteAsync(args, context, ct).ConfigureAwait(false),
                 _ => SkillInvocationResult.Error($"unknown tool '{toolName}'")
             };
         }
@@ -80,31 +81,37 @@ public sealed class FileSystemSkill : ISkill
         }
     }
 
-    private async Task<SkillInvocationResult> ReadAsync(JsonNode args, CancellationToken ct)
+    private async Task<SkillInvocationResult> ReadAsync(JsonNode args, SkillInvocationContext context, CancellationToken ct)
     {
-        var path = Resolve(args["path"]?.GetValue<string>() ?? "");
+        var root = ResolveRoot(context);
+        var path = Resolve(root, args["path"]?.GetValue<string>() ?? "");
         var text = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
         return SkillInvocationResult.Ok(
             JsonSerializer.Serialize(new { path, content = text }),
-            $"read {Path.GetRelativePath(_rootFull, path)} ({text.Length} chars)");
+            $"read {Path.GetRelativePath(root, path)} ({text.Length} chars)");
     }
 
-    private async Task<SkillInvocationResult> WriteAsync(JsonNode args, CancellationToken ct)
+    private async Task<SkillInvocationResult> WriteAsync(JsonNode args, SkillInvocationContext context, CancellationToken ct)
     {
-        var path = Resolve(args["path"]?.GetValue<string>() ?? "");
+        if (!CanWrite(context))
+            return SkillInvocationResult.Error("filesystem write is disabled by permission policy for current workspace");
+
+        var root = ResolveRoot(context);
+        var path = Resolve(root, args["path"]?.GetValue<string>() ?? "");
         var content = args["content"]?.GetValue<string>() ?? "";
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         await File.WriteAllTextAsync(path, content, ct).ConfigureAwait(false);
         return SkillInvocationResult.Ok(
             JsonSerializer.Serialize(new { path, bytes = System.Text.Encoding.UTF8.GetByteCount(content) }),
-            $"wrote {Path.GetRelativePath(_rootFull, path)}");
+            $"wrote {Path.GetRelativePath(root, path)}");
     }
 
-    private SkillInvocationResult List(JsonNode args)
+    private SkillInvocationResult List(JsonNode args, SkillInvocationContext context)
     {
+        var root = ResolveRoot(context);
         var rel = args["path"]?.GetValue<string>() ?? ".";
         var glob = args["glob"]?.GetValue<string>();
-        var dir = Resolve(rel);
+        var dir = Resolve(root, rel);
         if (!Directory.Exists(dir)) return SkillInvocationResult.Error($"directory not found: {rel}");
 
         IEnumerable<string> files;
@@ -117,17 +124,41 @@ public sealed class FileSystemSkill : ISkill
             var rooted = new Microsoft.Extensions.FileSystemGlobbing.Abstractions.DirectoryInfoWrapper(new DirectoryInfo(dir));
             files = matcher.Execute(rooted).Files.Select(f => Path.Combine(dir, f.Path));
         }
-        var entries = files.Select(f => Path.GetRelativePath(_rootFull, f)).Take(500).ToArray();
+        var entries = files.Select(f => Path.GetRelativePath(root, f)).Take(500).ToArray();
         return SkillInvocationResult.Ok(
-            JsonSerializer.Serialize(new { root = _rootFull, entries }),
+            JsonSerializer.Serialize(new { root, entries }),
             $"{entries.Length} entries");
     }
 
-    private string Resolve(string rel)
+    private string ResolveRoot(SkillInvocationContext context)
+    {
+        if (context.Metadata is not null
+            && context.Metadata.TryGetValue("workspacePath", out var workspacePath)
+            && !string.IsNullOrWhiteSpace(workspacePath))
+        {
+            var full = Path.GetFullPath(workspacePath);
+            Directory.CreateDirectory(full);
+            return full;
+        }
+        return _rootFull;
+    }
+
+    private bool CanWrite(SkillInvocationContext context)
+    {
+        if (_readOnly) return false;
+        if (context.Metadata is null) return true;
+        if (!context.Metadata.TryGetValue("permission", out var permission) || string.IsNullOrWhiteSpace(permission))
+            return true;
+
+        return string.Equals(permission, "full", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(permission, "write", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string Resolve(string rootFull, string rel)
     {
         if (Path.IsPathRooted(rel)) throw new InvalidOperationException("absolute paths are not allowed");
-        var full = Path.GetFullPath(Path.Combine(_rootFull, rel));
-        if (!full.StartsWith(_rootFull, StringComparison.OrdinalIgnoreCase))
+        var full = Path.GetFullPath(Path.Combine(rootFull, rel));
+        if (!full.StartsWith(rootFull, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("path escapes sandbox root");
         return full;
     }

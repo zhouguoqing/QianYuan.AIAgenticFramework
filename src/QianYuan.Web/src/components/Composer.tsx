@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AgentDto, ComposerMode, ImagePart, ProviderDto, SkillManifestDto } from '../types/api'
+import type { AgentDto, ComposerMode, ImagePart, ProviderDto, SkillManifestDto, WorkspaceContext } from '../types/api'
 import { listAgents, listProviders, listSkills, parseKnowledgeFile } from '../services/api'
 
 interface Props {
   busy: boolean
-  onSubmit: (text: string, images: ImagePart[], mode: ComposerMode) => void
+  onSubmit: (text: string, images: ImagePart[], mode: ComposerMode, workspace?: WorkspaceContext) => void
   onAbort: () => void
   selectedAgent?: string | null
   onAgentChange?: (id: string | null) => void
@@ -23,19 +23,12 @@ interface Props {
 
 type Panel = 'add' | 'mode' | 'expert' | 'skill' | 'model' | 'workspace' | 'permission' | null
 type Attachment = { url: string; mime: string; name: string; size: number; file?: File }
-
-const workspaceOptions = [
-  { id: '', label: '工作空间' },
-  { id: 'repo', label: '当前项目' },
-  { id: 'desktop', label: '桌面' },
-  { id: 'documents', label: '文档' },
-]
+type WorkspaceRoot = { id: string; label: string; path: string; writable: boolean; source: 'builtin' | 'selected' }
 
 const permissionOptions = [
-  { id: 'default', label: '默认权限' },
+  { id: 'full', label: '允许完全访问' },
   { id: 'readonly', label: '只读' },
   { id: 'confirm', label: '操作前确认' },
-  { id: 'write', label: '允许读写' },
 ]
 
 export function Composer({
@@ -57,7 +50,10 @@ export function Composer({
   const [providers, setProviders] = useState<ProviderDto[]>([])
   const [skills, setSkills] = useState<SkillManifestDto[]>([])
   const [workspace, setWorkspace] = useState(() => localStorage.getItem('workpartner.workspace') ?? '')
-  const [permission, setPermission] = useState(() => localStorage.getItem('workpartner.permission') ?? 'default')
+  const [workspaceLabel, setWorkspaceLabel] = useState(() => localStorage.getItem('workpartner.workspaceLabel') ?? 'QianYuan.AgenticFramew…')
+  const [workspaceSearch, setWorkspaceSearch] = useState('')
+  const [permission, setPermission] = useState(() => localStorage.getItem('workpartner.permission') ?? 'full')
+  const [workspaceRoots, setWorkspaceRoots] = useState<WorkspaceRoot[]>([])
   const ref = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -86,14 +82,32 @@ export function Composer({
       if (providerResult.status === 'fulfilled') setProviders(providerResult.value.providers)
       if (skillResult.status === 'fulfilled') setSkills(skillResult.value)
     }).catch(console.error)
+
+    const getRoots = window.workpartner?.fileSystem?.getRoots
+    if (getRoots) {
+      void getRoots()
+        .then(roots => {
+          setWorkspaceRoots(roots)
+          const hit = workspace ? roots.find(x => x.id === workspace) : undefined
+          if (hit) {
+            setWorkspaceLabel(hit.label || hit.path)
+            return
+          }
+          if (!workspace && roots.length > 0) {
+            setWorkspace(roots[0].id)
+            setWorkspaceLabel(roots[0].label || roots[0].path)
+          }
+        })
+        .catch(() => undefined)
+    }
   }, [])
 
   useEffect(() => { localStorage.setItem('workpartner.workspace', workspace) }, [workspace])
+  useEffect(() => { localStorage.setItem('workpartner.workspaceLabel', workspaceLabel) }, [workspaceLabel])
   useEffect(() => { localStorage.setItem('workpartner.permission', permission) }, [permission])
 
   const selectedAgentName = agents.find(a => a.id === selectedAgent)?.name ?? '专家'
-  const workspaceLabel = workspaceOptions.find(x => x.id === workspace)?.label ?? '工作空间'
-  const permissionLabel = permissionOptions.find(x => x.id === permission)?.label ?? '默认权限'
+  const permissionLabel = permissionOptions.find(x => x.id === permission)?.label ?? '允许完全访问'
   const modelLabel = selectedModel ? selectedModel : 'Auto · 云端'
 
   const modelOptions = useMemo(() => providers.flatMap(provider =>
@@ -122,12 +136,22 @@ export function Composer({
     const imageAttachments = attachments.filter(file => file.mime.startsWith('image/'))
     const fileAttachments = attachments.filter(file => !file.mime.startsWith('image/'))
     const parts: ImagePart[] = imageAttachments.map(i => ({ url: i.url, mime: i.mime, name: i.name, size: i.size }))
+    const selectedRoot = workspaceRoots.find(root => root.id === workspace)
+    const workspaceCtx: WorkspaceContext | undefined = selectedRoot || workspace || permission
+      ? {
+          workspaceId: workspace || undefined,
+          workspacePath: selectedRoot?.path,
+          workspaceLabel,
+          permission,
+        }
+      : undefined
+
     setParsingAttachments(true)
     try {
       const enrichedText = await appendAttachmentAnalysis(t, fileAttachments)
-      onSubmit(enrichedText, parts, mode)
+      onSubmit(enrichedText, parts, mode, workspaceCtx)
     } catch {
-      onSubmit(appendAttachmentSummary(t, fileAttachments), parts, mode)
+      onSubmit(appendAttachmentSummary(t, fileAttachments), parts, mode, workspaceCtx)
     } finally {
       setParsingAttachments(false)
     }
@@ -151,6 +175,27 @@ export function Composer({
 
   function chooseWorkspace(id: string) {
     setWorkspace(id)
+    const hit = workspaceRoots.find(x => x.id === id)
+    if (hit) setWorkspaceLabel(hit.label || hit.path)
+    setPanel(null)
+  }
+
+  async function chooseLocalWorkspace() {
+    const picker = window.workpartner?.fileSystem?.selectDirectory
+    if (!picker) {
+      setPanel(null)
+      return
+    }
+    const root = await picker()
+    if (!root) return
+    setWorkspaceRoots(prev => {
+      const next = prev.filter(item => item.id !== root.id)
+      next.unshift(root)
+      return next
+    })
+    setWorkspace(root.id)
+    setWorkspaceLabel(root.label || root.path || '本地工作空间')
+    setWorkspaceSearch('')
     setPanel(null)
   }
 
@@ -209,8 +254,17 @@ export function Composer({
           <span>{activeExpert.name}</span>
           <em onClick={e => { e.stopPropagation(); onClearExpert?.() }} title="取消召唤">×</em>
         </span>}
-        <button className="tool-chip" type="button" onClick={() => setPanel(panel === 'workspace' ? null : 'workspace')}>{workspaceLabel}</button>
-        <button className="tool-chip" type="button" onClick={() => setPanel(panel === 'permission' ? null : 'permission')}>{permissionLabel}</button>
+        <button className="tool-chip workspace-chip" type="button" onClick={() => setPanel(panel === 'workspace' ? null : 'workspace')}>
+          <span className="chip-icon" aria-hidden="true">□</span>
+          <strong>选择工作空间</strong>
+        </button>
+        <button
+          className={`tool-chip permission-chip ${permission === 'full' ? 'danger' : ''}`}
+          type="button"
+          onClick={() => setPanel(panel === 'permission' ? null : 'permission')}>
+          <span className="chip-icon" aria-hidden="true">!</span>
+          <strong>{permissionLabel}</strong>
+        </button>
         <span className="toolbar-spacer" />
         <button className="tool-chip" type="button" onClick={() => setPanel(panel === 'expert' ? null : 'expert')}>{selectedAgent ? selectedAgentName : '专家'}</button>
         <button className="tool-chip" type="button" onClick={() => setPanel(panel === 'skill' ? null : 'skill')}>{selectedSkills.length > 0 ? `技能 ${selectedSkills.length}` : '技能'}</button>
@@ -245,13 +299,49 @@ export function Composer({
         </>}
 
         {panel === 'workspace' && <>
-          <PanelTitle title="本地工作空间" />
-          {workspaceOptions.map(item => <ChoiceButton key={item.id} label={item.label} active={workspace === item.id} onClick={() => chooseWorkspace(item.id)} />)}
+          <div className="workspace-picker-head">
+            <label className="workspace-search" htmlFor="workspace-search-input">
+              <span aria-hidden="true">⌕</span>
+              <input
+                id="workspace-search-input"
+                value={workspaceSearch}
+                onChange={e => setWorkspaceSearch(e.target.value)}
+                placeholder="搜索工作空间"
+              />
+            </label>
+          </div>
+
+          <button className="workspace-row" type="button" onClick={() => chooseWorkspace(workspace || workspaceRoots[0]?.id || '')}>
+            <span className="workspace-row-icon" aria-hidden="true">□</span>
+            <span className="workspace-row-text" title={workspaceLabel}>{workspaceLabel}</span>
+          </button>
+
+          <div className="workspace-divider" />
+
+          <button className="workspace-row action" type="button" onClick={chooseLocalWorkspace}>
+            <span className="workspace-row-icon" aria-hidden="true">+</span>
+            <span className="workspace-row-text">新建工作空间</span>
+          </button>
+
+          <button className="workspace-row action" type="button" onClick={chooseLocalWorkspace}>
+            <span className="workspace-row-icon" aria-hidden="true">□</span>
+            <span className="workspace-row-text">打开本地文件夹</span>
+          </button>
         </>}
 
         {panel === 'permission' && <>
-          <PanelTitle title="权限控制" />
-          {permissionOptions.map(item => <ChoiceButton key={item.id} label={item.label} active={permission === item.id} onClick={() => choosePermission(item.id)} />)}
+          <div className="permission-panel-body">
+            <p>当前权限为允许完全访问，请注意数据安全，建议执行可信任的任务。</p>
+            <div className="permission-divider" />
+            <label className="permission-toggle-row">
+              <span>允许完全访问</span>
+              <input
+                type="checkbox"
+                checked={permission === 'full'}
+                onChange={e => choosePermission(e.target.checked ? 'full' : 'confirm')}
+              />
+            </label>
+          </div>
         </>}
 
         {panel === 'model' && <>
