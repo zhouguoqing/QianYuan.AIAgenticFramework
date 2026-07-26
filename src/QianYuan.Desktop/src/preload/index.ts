@@ -10,6 +10,11 @@ import {
   DesktopReadTextFileResult,
   DesktopWriteTextFileRequest,
 } from '../common/fileSystem.js'
+import {
+  localComputerChannels,
+  LocalCommandRuntime,
+  LocalCommandStartRequest,
+} from '../common/localComputer.js'
 
 interface WorkPartnerRuntime {
   apiBaseUrl: string
@@ -34,5 +39,11 @@ contextBridge.exposeInMainWorld('workpartner', {
     readTextFile: async (request: DesktopReadTextFileRequest): Promise<DesktopReadTextFileResult> => ipcRenderer.invoke(desktopFileSystemChannels.readTextFile, request),
     writeTextFile: async (request: DesktopWriteTextFileRequest): Promise<DesktopFileEntry> => ipcRenderer.invoke(desktopFileSystemChannels.writeTextFile, request),
     createDirectory: async (target: DesktopFileTarget): Promise<DesktopFileEntry> => ipcRenderer.invoke(desktopFileSystemChannels.createDirectory, target),
+  },
+  computer: {
+    startCommand: async (request: LocalCommandStartRequest): Promise<LocalCommandRuntime> => ipcRenderer.invoke(localComputerChannels.startCommand, request),
+    getCommand: async (id: string): Promise<LocalCommandRuntime | null> => ipcRenderer.invoke(localComputerChannels.getCommand, id),
+    listCommands: async (): Promise<LocalCommandRuntime[]> => ipcRenderer.invoke(localComputerChannels.listCommands),
+    cancelCommand: async (id: string): Promise<LocalCommandRuntime | null> => ipcRenderer.invoke(localComputerChannels.cancelCommand, id),
   },
 })

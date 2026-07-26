@@ -66,6 +66,10 @@ public static class McpMethods
     public const string ResourcesList = "resources/list";
     public const string ResourcesRead = "resources/read";
     public const string PromptsList = "prompts/list";
+    public const string TasksList = "tasks/list";
+    public const string TasksGet = "tasks/get";
+    public const string TasksResult = "tasks/result";
+    public const string TasksCancel = "tasks/cancel";
     public const string Ping = "ping";
 }
 

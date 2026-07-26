@@ -41,6 +41,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICreditService, CreditService>();
 builder.Services.AddScoped<IWorkTaskService, WorkTaskService>();
 builder.Services.AddScoped<IExpertTeamService, ExpertTeamService>();
+builder.Services.AddSingleton<IWorkTaskExecutionHarness, WorkTaskExecutionHarness>();
 builder.Services.AddSingleton<IExpertCatalogService, ExpertCatalogService>();
 builder.Services.AddHttpClient();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -283,7 +283,7 @@ const CATEGORY_ACCENTS: Record<string, string> = {
   '01-ProductDesign': '#d5567b',
   '04-DataAI': '#0f9d76',
   '03-GameSpatial': '#7c6cff',
-  '13-TencentZone': '#2f7bd6',
+  '13-QianYuanZone': '#2f7bd6',
 }
 
 function bannerAccent(categoryId: string): string {

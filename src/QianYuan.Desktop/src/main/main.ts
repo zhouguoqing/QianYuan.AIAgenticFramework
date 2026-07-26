@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import log from 'electron-log/main'
 import { startApi, ApiRuntime } from './apiProcess.js'
 import { registerFileSystemIpc } from './fileSystem.js'
+import { registerLocalComputerIpc } from './localComputer.js'
 import { preloadPath, webDistPath } from './paths.js'
 import { startStaticServer, StaticRuntime } from './staticServer.js'
 
@@ -57,6 +58,7 @@ app.whenReady().then(async () => {
     version: app.getVersion(),
   }))
   registerFileSystemIpc()
+  registerLocalComputerIpc()
   await createWindow()
 
   app.on('activate', () => {

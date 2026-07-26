@@ -12,10 +12,12 @@ namespace QianYuan.Api.Controllers;
 public sealed class WorkTasksController : ControllerBase
 {
     private readonly IWorkTaskService _tasks;
+    private readonly IWorkTaskExecutionHarness _harness;
 
-    public WorkTasksController(IWorkTaskService tasks)
+    public WorkTasksController(IWorkTaskService tasks, IWorkTaskExecutionHarness harness)
     {
         _tasks = tasks;
+        _harness = harness;
     }
 
     [HttpPost]
@@ -55,6 +57,51 @@ public sealed class WorkTasksController : ControllerBase
     {
         var artifact = await _tasks.GetArtifactAsync(GetUserId(), artifactId, ct);
         return artifact is null ? NotFound() : Ok(artifact);
+    }
+
+    [HttpPost("{taskId:guid}/run")]
+    public async Task<ActionResult<WorkTaskDetailDto>> Run(Guid taskId, ExecuteTaskRequest request, CancellationToken ct)
+    {
+        try
+        {
+            return Ok(await _harness.RunAsync(GetUserId(), taskId, request, ct));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    [HttpGet("{taskId:guid}/runtime")]
+    public async Task<ActionResult<WorkTaskRuntimeDto>> Runtime(Guid taskId, CancellationToken ct)
+    {
+        try
+        {
+            return Ok(await _harness.GetRuntimeAsync(GetUserId(), taskId, ct));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+    }
+
+    [HttpGet("runtimes")]
+    public async Task<ActionResult<IReadOnlyList<WorkTaskRuntimeDto>>> Runtimes(CancellationToken ct)
+    {
+        return Ok(await _harness.ListRuntimesAsync(GetUserId(), ct));
+    }
+
+    [HttpPost("{taskId:guid}/cancel")]
+    public async Task<ActionResult<WorkTaskRuntimeDto>> Cancel(Guid taskId, CancelWorkTaskRequest request, CancellationToken ct)
+    {
+        try
+        {
+            return Ok(await _harness.CancelAsync(GetUserId(), taskId, request.Reason, ct));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
     }
 
     private Guid GetUserId()

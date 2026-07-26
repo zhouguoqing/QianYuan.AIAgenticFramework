@@ -65,6 +65,37 @@ interface WorkPartnerFileSystemApi {
   createDirectory: (target: WorkPartnerFileTarget) => Promise<WorkPartnerFileEntry>
 }
 
+interface WorkPartnerLocalCommandRequest {
+  command: string
+  args?: string[]
+  cwd?: string
+  timeoutMs?: number
+  env?: Record<string, string>
+}
+
+interface WorkPartnerLocalCommandRuntime {
+  id: string
+  pid?: number
+  command: string
+  args: string[]
+  cwd: string
+  status: 'running' | 'completed' | 'failed' | 'canceled' | 'timeout'
+  startedAt: string
+  finishedAt?: string
+  exitCode?: number | null
+  signal?: string | null
+  stdout: string
+  stderr: string
+  error?: string
+}
+
+interface WorkPartnerLocalComputerApi {
+  startCommand: (request: WorkPartnerLocalCommandRequest) => Promise<WorkPartnerLocalCommandRuntime>
+  getCommand: (id: string) => Promise<WorkPartnerLocalCommandRuntime | null>
+  listCommands: () => Promise<WorkPartnerLocalCommandRuntime[]>
+  cancelCommand: (id: string) => Promise<WorkPartnerLocalCommandRuntime | null>
+}
+
 declare global {
   interface Window {
     workpartner?: {
@@ -77,6 +108,7 @@ declare global {
         version: string
       }>
       fileSystem?: WorkPartnerFileSystemApi
+      computer?: WorkPartnerLocalComputerApi
     }
   }
 }

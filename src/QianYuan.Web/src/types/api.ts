@@ -275,6 +275,16 @@ export interface WorkTaskDetailDto {
   artifacts: WorkArtifactDto[]
 }
 
+export interface WorkTaskRuntimeDto {
+  taskId: string
+  status: string
+  isRunning: boolean
+  startedAt: string
+  finishedAt?: string | null
+  lastError?: string | null
+  cancelReason?: string | null
+}
+
 export interface ExpertTeamMemberDto {
   id: string
   memberOrder: number

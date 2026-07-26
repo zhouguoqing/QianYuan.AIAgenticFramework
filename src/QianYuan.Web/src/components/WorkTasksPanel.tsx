@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react'
-import type { ExpertTeamDto, WorkTaskDetailDto, WorkTaskDto } from '../types/api'
-import { createWorkTask, executeWorkTask, getWorkTask, listExpertTeams, listWorkTasks, orchestrateWorkTask } from '../services/api'
+import type { ExpertTeamDto, WorkTaskDetailDto, WorkTaskDto, WorkTaskRuntimeDto } from '../types/api'
+import { cancelWorkTask, createWorkTask, getWorkTask, getWorkTaskRuntime, listExpertTeams, listWorkTasks, orchestrateWorkTask, runWorkTask } from '../services/api'
 
 interface Props {
   provider?: string | null
@@ -17,6 +17,7 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
   const [teamId, setTeamId] = useState<string>('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [runtime, setRuntime] = useState<WorkTaskRuntimeDto | null>(null)
 
   useEffect(() => {
     reload()
@@ -36,6 +37,11 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
   async function openTask(id: string) {
     const detail = await getWorkTask(id)
     setSelected(detail)
+    try {
+      setRuntime(await getWorkTaskRuntime(id))
+    } catch {
+      setRuntime(null)
+    }
   }
 
   async function submit(e: FormEvent) {
@@ -72,21 +78,57 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
     }
   }
 
-  async function execute() {
+  async function run() {
     if (!selected) return
     setBusy(true)
     setError(null)
     try {
-      const detail = await executeWorkTask(selected.task.id, selected.task.teamId || teamId || undefined)
+      const detail = await runWorkTask(selected.task.id, selected.task.teamId || teamId || undefined)
       setSelected(detail)
+      setRuntime(await getWorkTaskRuntime(selected.task.id))
       const items = await listWorkTasks()
       setTasks(items)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to execute task')
+      setError(err instanceof Error ? err.message : 'Failed to run task')
     } finally {
       setBusy(false)
     }
   }
+
+  async function cancel() {
+    if (!selected) return
+    setBusy(true)
+    setError(null)
+    try {
+      const next = await cancelWorkTask(selected.task.id, 'cancel from work tasks panel')
+      setRuntime(next)
+      setSelected(await getWorkTask(selected.task.id))
+      const items = await listWorkTasks()
+      setTasks(items)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to cancel task')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!selected || !runtime?.isRunning) return
+    const timer = window.setInterval(async () => {
+      try {
+        const next = await getWorkTaskRuntime(selected.task.id)
+        setRuntime(next)
+        if (!next.isRunning) {
+          setSelected(await getWorkTask(selected.task.id))
+          const items = await listWorkTasks()
+          setTasks(items)
+        }
+      } catch {
+        // keep previous state if polling fails temporarily
+      }
+    }, 2000)
+    return () => window.clearInterval(timer)
+  }, [selected?.task.id, runtime?.isRunning])
 
   return (
     <div className="modal-backdrop">
@@ -136,8 +178,10 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
                 </div>
                 <div className="worktask-actions">
                   <span className="mini-status">{selected.task.status}</span>
+                  {runtime && <span className="mini-status">Runtime: {runtime.status}</span>}
                   <button className="primary-inline-btn" disabled={busy} onClick={orchestrate}>编排专家团</button>
-                  <button className="primary-inline-btn" disabled={busy} onClick={execute}>执行专家团</button>
+                  <button className="primary-inline-btn" disabled={busy} onClick={run}>运行任务</button>
+                  <button className="ghost" disabled={busy || !runtime?.isRunning} onClick={cancel}>取消运行</button>
                 </div>
               </div>
               {selected.task.teamId && <div className="worktask-team-note">已绑定专家团：{teams.find(t => t.id === selected.task.teamId)?.name ?? selected.task.teamId}</div>}

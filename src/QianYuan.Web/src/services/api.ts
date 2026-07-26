@@ -7,7 +7,7 @@ import type {
   AgentInteractChunk, AuthResponse, AuthUserDto, LoginRequest, RegisterRequest,
   CreditWalletDto, CreditTransactionDto, SubscriptionPlanDto, EstimateCreditsRequest, EstimateCreditsResponse,
   CreateWorkTaskRequest, WorkTaskDetailDto, WorkTaskDto, WorkArtifactDto,
-  ExpertTeamDto,
+  ExpertTeamDto, WorkTaskRuntimeDto,
   ExpertCategoryDto, ExpertScenarioDto, ExpertListResultDto, ExpertDetailDto, ExpertPromptDto,
 } from '../types/api'
 
@@ -149,6 +149,22 @@ export async function orchestrateWorkTask(taskId: string, teamId?: string | null
 export async function executeWorkTask(taskId: string, teamId?: string | null, maxIterations = 8, timeoutSeconds = 90): Promise<WorkTaskDetailDto> {
   return readJsonOrThrow(await apiFetch(`${API}/work-tasks/${encodeURIComponent(taskId)}/execute`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teamId: teamId || null, maxIterations, timeoutSeconds }),
+  }))
+}
+
+export async function runWorkTask(taskId: string, teamId?: string | null, maxIterations = 8, timeoutSeconds = 90): Promise<WorkTaskDetailDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/work-tasks/${encodeURIComponent(taskId)}/run`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ teamId: teamId || null, maxIterations, timeoutSeconds }),
+  }))
+}
+
+export async function getWorkTaskRuntime(taskId: string): Promise<WorkTaskRuntimeDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/work-tasks/${encodeURIComponent(taskId)}/runtime`))
+}
+
+export async function cancelWorkTask(taskId: string, reason?: string): Promise<WorkTaskRuntimeDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/work-tasks/${encodeURIComponent(taskId)}/cancel`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: reason || null }),
   }))
 }
 

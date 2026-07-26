@@ -43,7 +43,17 @@ public sealed class McpServerCore
                     return JsonRpc.Result(id!, new JsonObject
                     {
                         ["protocolVersion"] = McpProtocolInfo.ProtocolVersion,
-                        ["capabilities"] = new JsonObject { ["tools"] = new JsonObject() },
+                        ["capabilities"] = new JsonObject
+                        {
+                            ["tools"] = new JsonObject(),
+                            ["tasks"] = new JsonObject
+                            {
+                                ["requests"] = new JsonObject
+                                {
+                                    ["tools/call"] = true,
+                                }
+                            }
+                        },
                         ["serverInfo"] = new JsonObject { ["name"] = _serverName, ["version"] = "0.1.0" }
                     });
 

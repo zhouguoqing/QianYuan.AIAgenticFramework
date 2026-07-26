@@ -45,3 +45,14 @@ public sealed record WorkTaskDetailDto(
     WorkTaskDto Task,
     IReadOnlyList<WorkStepDto> Steps,
     IReadOnlyList<WorkArtifactDto> Artifacts);
+
+public sealed record CancelWorkTaskRequest(string? Reason);
+
+public sealed record WorkTaskRuntimeDto(
+    Guid TaskId,
+    string Status,
+    bool IsRunning,
+    DateTime StartedAt,
+    DateTime? FinishedAt,
+    string? LastError,
+    string? CancelReason);

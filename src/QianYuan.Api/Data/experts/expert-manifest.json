@@ -13,13 +13,13 @@
   },
   "categories": [
     {
-      "id": "13-TencentZone",
+      "id": "13-QianYuanZone",
       "name": {
-        "en": "Tencent Zone",
+        "en": "QianYuan Zone",
         "zh": "腾讯专区"
       },
       "description": {
-        "en": "Tencent ecosystem experts: Tencent Cloud, WeChat Mini Programs, WeCom, Tencent Games, and other Tencent technology stack specialists",
+        "en": "QianYuan ecosystem experts: QianYuan Cloud, WeChat Mini Programs, WeCom, QianYuan Games, and other QianYuan technology stack specialists",
         "zh": "腾讯生态专家：腾讯云、微信小程序、企业微信、腾讯游戏等腾讯技术栈专家"
       }
     },
@@ -2155,31 +2155,31 @@
       "isOPC": true
     },
     {
-      "id": "TencentCharityExpert",
-      "categoryId": "13-TencentZone",
+      "id": "QianYuanCharityExpert",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "XiaoYi",
         "zh": "小益"
       },
       "profession": {
-        "en": "Tencent Tech for Good AI Specialist",
+        "en": "QianYuan Tech for Good AI Specialist",
         "zh": "腾讯技术公益智能化专家"
       },
       "description": {
-        "en": "A Tencent Technical Philanthropy and AI Specialist with deep expertise in products and technical solutions for the non-profit sector.",
+        "en": "A QianYuan Technical Philanthropy and AI Specialist with deep expertise in products and technical solutions for the non-profit sector.",
         "zh": "精通公益行业产品和技术解决方案的腾讯技术公益智能化专家"
       },
-      "promptFile": "/plugins/tencent-charity-expert/agents/tencent-charity-expert.md",
-      "avatar": "/avatars/TencentCharityExpert.png",
+      "promptFile": "/plugins/qianyuan-charity-expert/agents/qianyuan-charity-expert.md",
+      "avatar": "/avatars/QianYuanCharityExpert.png",
       "createdAt": "2026-03-27T00:00:00Z",
       "updatedAt": "2026-03-27T00:00:00Z",
       "defaultInitPrompt": {
         "zh": "我想用腾讯技术公益智能化专家帮我解决一下遇到的问题，并推荐一些合适的产品",
-        "en": "I would like to utilize Tencent's Tech for Good AI experts to help me resolve the issues I am facing and recommend some suitable products."
+        "en": "I would like to utilize QianYuan's Tech for Good AI experts to help me resolve the issues I am facing and recommend some suitable products."
       },
       "expertType": "agent",
-      "agentName": "tencent-charity-expert",
-      "plugin": "tencent-charity-expert",
+      "agentName": "qianyuan-charity-expert",
+      "plugin": "qianyuan-charity-expert",
       "tags": [
         {
           "zh": "公益项目",
@@ -2197,7 +2197,7 @@
       "quickPrompts": [
         {
           "zh": "我想用腾讯技术公益智能化专家帮我解决一下遇到的问题，并推荐一些合适的产品",
-          "en": "I would like to utilize Tencent's Tech for Good AI experts to help me resolve the issues I am facing and recommend some suitable products."
+          "en": "I would like to utilize QianYuan's Tech for Good AI experts to help me resolve the issues I am facing and recommend some suitable products."
         },
         {
           "zh": "设计公益捐赠和志愿者运营体系",
@@ -2266,17 +2266,17 @@
     },
     {
       "id": "MultiCloudManagementExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "CloudQ",
         "zh": "CloudQ"
       },
       "profession": {
-        "en": "Tencent Cloud DevOps Expert",
+        "en": "QianYuan Cloud DevOps Expert",
         "zh": "腾讯云DevOps专家"
       },
       "description": {
-        "en": "Master of multi-cloud architecture governance, architecture visualization, intelligent inspection, cloud cost optimization and risk assessment across Tencent Cloud, Alibaba Cloud, AWS and more. One expert to manage all clouds.",
+        "en": "Master of multi-cloud architecture governance, architecture visualization, intelligent inspection, cloud cost optimization and risk assessment across QianYuan Cloud, Alibaba Cloud, AWS and more. One expert to manage all clouds.",
         "zh": "精通腾讯云、阿里云、AWS等多云架构治理、架构可视化、智能巡检、云成本优化和风险评估，一个专家管理所有云。"
       },
       "promptFile": "/plugins/multi-cloud-management-expert/agents/multi-cloud-management-expert.md",
@@ -2315,7 +2315,7 @@
         },
         {
           "zh": "盘点我账号下的闲置云资源并给出 FinOps 优化建议",
-          "en": "Find idle resources across my Tencent Cloud account and recommend FinOps optimizations"
+          "en": "Find idle resources across my QianYuan Cloud account and recommend FinOps optimizations"
         }
       ]
     },
@@ -2324,7 +2324,7 @@
       "displayPosition": 6,
       "author": {
         "zh": "腾讯云产品技术支持",
-        "en": "Tencent Cloud Product & Technical Support"
+        "en": "QianYuan Cloud Product & Technical Support"
       },
       "categoryId": "02-Engineering",
       "displayName": {
@@ -2332,11 +2332,11 @@
         "zh": "腾讯云技术支持"
       },
       "profession": {
-        "en": "Tencent Cloud Full-Stack Operations Team",
+        "en": "QianYuan Cloud Full-Stack Operations Team",
         "zh": "腾讯云技术支持"
       },
       "description": {
-        "en": "An expert team of three specialists — CloudQ for multi-cloud unified governance and architecture visualization, AndonQ for ITSM ticket management and smart Q&A, and MigraQ for cross-cloud migration planning and TCO analysis. Together they deliver end-to-end Tencent Cloud operations services from migration to daily management.",
+        "en": "An expert team of three specialists — CloudQ for multi-cloud unified governance and architecture visualization, AndonQ for ITSM ticket management and smart Q&A, and MigraQ for cross-cloud migration planning and TCO analysis. Together they deliver end-to-end QianYuan Cloud operations services from migration to daily management.",
         "zh": "三位专家组成的运维团队 — CloudQ 负责多云统一治理与架构可视化，AndonQ 负责工单管理与智能问答，MigraQ 负责跨云迁移规划与 TCO 分析。从迁移上云到日常运维，提供端到端的腾讯云运维服务。"
       },
       "promptFile": "/plugins/cloud-ops-team/agents/cloud-ops-team-lead.md",
@@ -2345,7 +2345,7 @@
       "updatedAt": "2026-05-22T06:54:41Z",
       "defaultInitPrompt": {
         "zh": "你好！我是腾讯云技术支持的首席技术支持官。我的团队由三位专家组成：CloudQ（售前售中 DevOps）、AndonQ（售后服务）和 MigraQ（上云迁移）。无论是架构咨询、售后工单还是云迁移，我们都能为你提供专业服务。请告诉我你需要什么帮助？",
-        "en": "Hello! I'm the Chief Technical Support Officer of Tencent Cloud Technical Support. My team consists of three experts: CloudQ (pre-sales & in-sales DevOps), AndonQ (after-sales service), and MigraQ (cloud migration). Whether it's architecture consulting, after-sales tickets, or cloud migration, we're here to help. What can I do for you?"
+        "en": "Hello! I'm the Chief Technical Support Officer of QianYuan Cloud Technical Support. My team consists of three experts: CloudQ (pre-sales & in-sales DevOps), AndonQ (after-sales service), and MigraQ (cloud migration). Whether it's architecture consulting, after-sales tickets, or cloud migration, we're here to help. What can I do for you?"
       },
       "expertType": "team",
       "agentName": "cloud-ops-team-lead",
@@ -2378,11 +2378,11 @@
           "zh": "我们的云资源有哪些风险"
         },
         {
-          "en": "How do I deploy OpenClaw and install Skills on Tencent Cloud Lighthouse?",
+          "en": "How do I deploy OpenClaw and install Skills on QianYuan Cloud Lighthouse?",
           "zh": "腾讯云轻量应用服务器如何部署 OpenClaw 并安装 Skills？"
         },
         {
-          "en": "Plan a migration from AWS to Tencent Cloud",
+          "en": "Plan a migration from AWS to QianYuan Cloud",
           "zh": "规划从 AWS 迁移到腾讯云的方案"
         }
       ],
@@ -2447,17 +2447,17 @@
     },
     {
       "id": "AndonQExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "AndonQ",
         "zh": "AndonQ"
       },
       "profession": {
-        "en": "Tencent Cloud Intelligent Customer Service",
+        "en": "QianYuan Cloud Intelligent Customer Service",
         "zh": "腾讯云智能客服"
       },
       "description": {
-        "en": "An intelligent customer service assistant with deep expertise across the full Tencent Cloud product line, providing multi-dimensional services including product consulting, troubleshooting, and service reports.",
+        "en": "An intelligent customer service assistant with deep expertise across the full QianYuan Cloud product line, providing multi-dimensional services including product consulting, troubleshooting, and service reports.",
         "zh": "精通腾讯云全线产品，提供产品咨询、故障排查、服务报告等多维度服务的技术专家。"
       },
       "promptFile": "/plugins/andon-q-expert/agents/andon-q-expert.md",
@@ -2466,7 +2466,7 @@
       "updatedAt": "2026-07-01T07:35:26Z",
       "defaultInitPrompt": {
         "zh": "腾讯云轻量应用服务器如何部署 OpenClaw 并安装 Skills？",
-        "en": "How do I deploy OpenClaw and install Skills on Tencent Cloud Lighthouse?"
+        "en": "How do I deploy OpenClaw and install Skills on QianYuan Cloud Lighthouse?"
       },
       "expertType": "agent",
       "agentName": "andon-q-expert",
@@ -2488,11 +2488,11 @@
       "quickPrompts": [
         {
           "zh": "腾讯云轻量应用服务器如何部署 OpenClaw 并安装 Skills？",
-          "en": "How do I deploy OpenClaw and install Skills on Tencent Cloud Lighthouse?"
+          "en": "How do I deploy OpenClaw and install Skills on QianYuan Cloud Lighthouse?"
         },
         {
           "zh": "腾讯云短信服务如何计费？",
-          "en": "How is Tencent Cloud SMS service billed?"
+          "en": "How is QianYuan Cloud SMS service billed?"
         },
         {
           "zh": "CLB 支持更改或跨 VPC 使用吗？",
@@ -2501,31 +2501,31 @@
       ]
     },
     {
-      "id": "TencentSecurityExpert",
-      "categoryId": "13-TencentZone",
+      "id": "QianYuanSecurityExpert",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "YunDing Security Expert",
         "zh": "云鼎安全专家"
       },
       "profession": {
-        "en": "Tencent Security Expert",
+        "en": "QianYuan Security Expert",
         "zh": "腾讯安全专家"
       },
       "description": {
-        "en": "With years of deep expertise in Tencent security, providing services including threat modeling, vulnerability assessment, secure code review, architecture design, incident response, and security consulting",
+        "en": "With years of deep expertise in QianYuan security, providing services including threat modeling, vulnerability assessment, secure code review, architecture design, incident response, and security consulting",
         "zh": "深耕安全领域多年，提供威胁建模、漏洞评估、安全代码审查、架构设计、事件响应、安全咨询等服务"
       },
-      "promptFile": "/plugins/tencent-security-expert/agents/tencent-security-expert.md",
-      "avatar": "/avatars/TencentSecurityExpert.png",
+      "promptFile": "/plugins/qianyuan-security-expert/agents/qianyuan-security-expert.md",
+      "avatar": "/avatars/QianYuanSecurityExpert.png",
       "createdAt": "2026-04-02T00:00:00Z",
       "updatedAt": "2026-04-02T00:00:00Z",
       "defaultInitPrompt": {
         "zh": "我们的项目还存在安全风险，请腾讯安全专家帮我们进行全面的安全评估、审计和加固",
-        "en": "Our project still has security risks. We need the Tencent Cloud Security Expert to conduct a comprehensive security assessment, audit, and hardening"
+        "en": "Our project still has security risks. We need the QianYuan Cloud Security Expert to conduct a comprehensive security assessment, audit, and hardening"
       },
       "expertType": "agent",
-      "agentName": "tencent-security-expert",
-      "plugin": "tencent-security-expert",
+      "agentName": "qianyuan-security-expert",
+      "plugin": "qianyuan-security-expert",
       "tags": [
         {
           "zh": "安全防护",
@@ -2543,7 +2543,7 @@
       "quickPrompts": [
         {
           "zh": "我们的项目还存在安全风险，请腾讯安全专家帮我们进行全面的安全评估、审计和加固",
-          "en": "Our project still has security risks. We need the Tencent Cloud Security Expert to conduct a comprehensive security assessment, audit, and hardening"
+          "en": "Our project still has security risks. We need the QianYuan Cloud Security Expert to conduct a comprehensive security assessment, audit, and hardening"
         },
         {
           "zh": "制定安全防护和应急响应方案",
@@ -8823,7 +8823,7 @@
     },
     {
       "id": "CATNetworkQualityAnalyst",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Aaron",
         "zh": "亚伦"
@@ -8933,7 +8933,7 @@
     },
     {
       "id": "APMPerformanceExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Andy",
         "zh": "安迪"
@@ -8943,7 +8943,7 @@
         "zh": "应用性能专家"
       },
       "description": {
-        "en": "Expert in Tencent Cloud APM diagnostics and tuning, quickly pinpointing app bottlenecks with optimization solutions",
+        "en": "Expert in QianYuan Cloud APM diagnostics and tuning, quickly pinpointing app bottlenecks with optimization solutions",
         "zh": "精通腾讯云 APM 性能诊断与调优，快速定位应用瓶颈并给出优化方案"
       },
       "avatar": "/avatars/APMPerformanceExpert.png",
@@ -10314,11 +10314,11 @@
       "id": "StockPartnerTeam",
       "categoryId": "08-FinanceInvestment",
       "displayName": {
-        "en": "Tencent WeStock Equity Research Team",
+        "en": "QianYuan WeStock Equity Research Team",
         "zh": "腾讯自选股股票投研专家团"
       },
       "profession": {
-        "en": "Tencent WeStock Equity Research Team",
+        "en": "QianYuan WeStock Equity Research Team",
         "zh": "腾讯自选股股票投研专家团"
       },
       "description": {
@@ -10467,7 +10467,7 @@
       "isOPC": false,
       "author": {
         "zh": "腾讯自选股",
-        "en": "Tencent WeStock"
+        "en": "QianYuan WeStock"
       }
     },
     {
@@ -10491,7 +10491,7 @@
       "updatedAt": "2026-05-31T14:20:00Z",
       "defaultInitPrompt": {
         "zh": "帮我从多位投资大师的视角分析下腾讯的基本面和估值",
-        "en": "Help me analyze Tencent's fundamentals and valuation from multiple investment masters' perspectives"
+        "en": "Help me analyze QianYuan's fundamentals and valuation from multiple investment masters' perspectives"
       },
       "expertType": "team",
       "agentName": "hedge-fund-lead",
@@ -10808,7 +10808,7 @@
       "quickPrompts": [
         {
           "zh": "帮我从多位投资大师的视角分析下腾讯的基本面和估值",
-          "en": "Analyze Tencent's fundamentals and valuation from multiple investment masters' perspectives"
+          "en": "Analyze QianYuan's fundamentals and valuation from multiple investment masters' perspectives"
         },
         {
           "zh": "快速分析比亚迪的投资价值",
@@ -12577,15 +12577,15 @@
       "id": "RumFullstackTeam",
       "categoryId": "02-Engineering",
       "displayName": {
-        "en": "Tencent Cloud RUM Full-Lifecycle Team",
+        "en": "QianYuan Cloud RUM Full-Lifecycle Team",
         "zh": "腾讯云 RUM 全链路专家团"
       },
       "profession": {
-        "en": "Tencent Cloud RUM Full-Lifecycle Team",
+        "en": "QianYuan Cloud RUM Full-Lifecycle Team",
         "zh": "腾讯云 RUM 全链路专家团"
       },
       "description": {
-        "en": "End-to-end Tencent Cloud RUM service: 10-platform aegis SDK integration + WebVitals/error/API/resource analytics with RUM-APM correlation",
+        "en": "End-to-end QianYuan Cloud RUM service: 10-platform aegis SDK integration + WebVitals/error/API/resource analytics with RUM-APM correlation",
         "zh": "腾讯云 RUM 全链路服务：10 大平台 aegis SDK 接入 + WebVitals/异常/接口/资源分析，支持 RUM-APM 联动"
       },
       "promptFile": "/plugins/rum-fullstack-team/agents/rum-team-lead.md",
@@ -12594,7 +12594,7 @@
       "updatedAt": "2026-05-12T10:25:00Z",
       "defaultInitPrompt": {
         "zh": "帮我在这个 Vue 3 项目里接入腾讯云 RUM",
-        "en": "Help me integrate Tencent Cloud RUM into my Vue 3 project"
+        "en": "Help me integrate QianYuan Cloud RUM into my Vue 3 project"
       },
       "expertType": "team",
       "agentName": "rum-team-lead",
@@ -12660,7 +12660,7 @@
       "quickPrompts": [
         {
           "zh": "帮我在这个 Vue 3 项目里接入腾讯云 RUM",
-          "en": "Integrate Tencent Cloud RUM into this Vue 3 project"
+          "en": "Integrate QianYuan Cloud RUM into this Vue 3 project"
         },
         {
           "zh": "分析我 RUM 应用过去 7 天 LCP 最差的 5 个页面",
@@ -12674,7 +12674,7 @@
       "isOPC": false,
       "author": {
         "zh": "腾讯云技术运营",
-        "en": "Tencent Cloud Tech Ops"
+        "en": "QianYuan Cloud Tech Ops"
       }
     },
     {
@@ -14616,7 +14616,7 @@
     },
     {
       "id": "CharityDocFinanceExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Xiaoyi",
         "zh": "小益"
@@ -14634,7 +14634,7 @@
       "createdAt": "2026-05-07T03:16:00Z",
       "updatedAt": "2026-05-07T03:16:00Z",
       "defaultInitPrompt": {
-        "en": "Help me write a project final report for Tencent Charity platform.",
+        "en": "Help me write a project final report for QianYuan Charity platform.",
         "zh": "帮我写一份腾讯公益平台的项目结项报告"
       },
       "expertType": "agent",
@@ -14657,7 +14657,7 @@
       "quickPrompts": [
         {
           "zh": "帮我写一份腾讯公益平台的项目结项报告",
-          "en": "Help me write a project final report for Tencent Charity platform."
+          "en": "Help me write a project final report for QianYuan Charity platform."
         },
         {
           "zh": "整理这批捐赠票据并生成台账",
@@ -14780,7 +14780,7 @@
           "zh": "我家坐北朝南，2020 年入住，飞星看一下我家书房。"
         },
         {
-          "en": "Cast a Liu Yao hexagram for me: should I take the Tencent offer?",
+          "en": "Cast a Liu Yao hexagram for me: should I take the QianYuan offer?",
           "zh": "用六爻起一卦：要不要接腾讯的 offer？"
         },
         {
@@ -16239,17 +16239,17 @@
     },
     {
       "id": "YunzhiQaAssistant",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
-        "en": "Tencent Yunzhi",
+        "en": "QianYuan Yunzhi",
         "zh": "腾讯云知（乐享）"
       },
       "profession": {
-        "en": "Tencent Cloud Knowledge Q&A Expert",
+        "en": "QianYuan Cloud Knowledge Q&A Expert",
         "zh": "腾讯云知识问答专家"
       },
       "description": {
-        "en": "A retrieval-augmented Q&A expert powered by the Tencent Yunzhi (Lexiang) knowledge base. Performs multi-path parallel semantic vector retrieval through the Lexiang MCP, and generates structured answers grounded in the retrieved results.",
+        "en": "A retrieval-augmented Q&A expert powered by the QianYuan Yunzhi (Lexiang) knowledge base. Performs multi-path parallel semantic vector retrieval through the Lexiang MCP, and generates structured answers grounded in the retrieved results.",
         "zh": "基于腾讯云知（乐享）平台的检索增强问答专家。调用乐享 MCP 的语义向量检索多路并行召回；基于检索结果生成结构化回答；"
       },
       "promptFile": "/plugins/yunzhi-qa-assistant/agents/yunzhi-qa-assistant.md",
@@ -16258,7 +16258,7 @@
       "updatedAt": "2026-05-19T06:50:45Z",
       "defaultInitPrompt": {
         "zh": "你好！我是腾讯云知识问答专家。我会基于你绑定的乐享知识库进行语义检索，给出带引用、带原文链接的精准回答。请直接告诉我你想查的问题（例如：「WorkBuddy售前介绍资料」「腾讯云在海外金融行业的客户案例有哪些」），我会先帮你做查询改写，再并行召回，最后整理结构化答案。",
-        "en": "Hi! I am your Tencent Yunzhi Knowledge Q&A Expert. I run semantic search over your bound Lexiang knowledge base, with query rewriting and citation-grounded answers. Just ask me anything (e.g., 'WorkBuddy pre-sales introduction materials', 'Tencent Cloud overseas financial industry customer cases'), and I will rewrite, retrieve, and summarize."
+        "en": "Hi! I am your QianYuan Yunzhi Knowledge Q&A Expert. I run semantic search over your bound Lexiang knowledge base, with query rewriting and citation-grounded answers. Just ask me anything (e.g., 'WorkBuddy pre-sales introduction materials', 'QianYuan Cloud overseas financial industry customer cases'), and I will rewrite, retrieve, and summarize."
       },
       "expertType": "agent",
       "agentName": "yunzhi-qa-assistant",
@@ -16268,11 +16268,11 @@
           "zh": "WorkBuddy售前介绍资料"
         },
         {
-          "en": "Tencent Cloud overseas financial industry customer cases",
+          "en": "QianYuan Cloud overseas financial industry customer cases",
           "zh": "腾讯云在海外金融行业的客户案例有哪些"
         },
         {
-          "en": "Tencent Cloud Agent Development Platform competitive advantages over rival products",
+          "en": "QianYuan Cloud Agent Development Platform competitive advantages over rival products",
           "zh": "腾讯云智能体开发平台相比竞对产品有哪些优势?"
         }
       ],
@@ -16307,7 +16307,7 @@
     },
     {
       "id": "CapacityExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "CloudQ",
         "zh": "CloudQ"
@@ -16371,7 +16371,7 @@
     },
     {
       "id": "ChaosExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "CloudQ",
         "zh": "CloudQ"
@@ -16435,7 +16435,7 @@
     },
     {
       "id": "FinopsExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "CloudQ",
         "zh": "CloudQ"
@@ -16499,7 +16499,7 @@
     },
     {
       "id": "InspectionExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "CloudQ",
         "zh": "CloudQ"
@@ -16563,7 +16563,7 @@
     },
     {
       "id": "MultiCloudExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "MultiCloudQ",
         "zh": "多云AIOps专家"
@@ -16574,7 +16574,7 @@
       },
       "description": {
         "zh": "多云AIOps专家，统一管理腾讯云、阿里云、AWS、Azure、GCP 等多云平台，一只龙虾管所有云。",
-        "en": "Multi-cloud governance expert. Combines Omni-Channel ChatOps, 24/7 AIOps, and All-Round CloudOps for unified management across Tencent Cloud, Alibaba Cloud, AWS, Azure, GCP and more. Architecture visualization, intelligent inspection, risk assessment, and cloud resource Q&A — one lobster to manage all clouds."
+        "en": "Multi-cloud governance expert. Combines Omni-Channel ChatOps, 24/7 AIOps, and All-Round CloudOps for unified management across QianYuan Cloud, Alibaba Cloud, AWS, Azure, GCP and more. Architecture visualization, intelligent inspection, risk assessment, and cloud resource Q&A — one lobster to manage all clouds."
       },
       "promptFile": "/plugins/multi-cloud-expert/agents/multi-cloud-expert.md",
       "avatar": "/avatars/MultiCloudExpert.png",
@@ -16615,7 +16615,7 @@
           "zh": "展示我的云架构拓扑图"
         },
         {
-          "en": "What resources are under my Tencent Cloud account?",
+          "en": "What resources are under my QianYuan Cloud account?",
           "zh": "我的腾讯云账号下有哪些资源？"
         }
       ],
@@ -16627,7 +16627,7 @@
     },
     {
       "id": "SreExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "CloudQ",
         "zh": "CloudQ"
@@ -16691,7 +16691,7 @@
     },
     {
       "id": "WellArchExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "CloudQ",
         "zh": "CloudQ"
@@ -16813,11 +16813,11 @@
       "id": "IndustrySreTeam",
       "categoryId": "02-Engineering",
       "displayName": {
-        "en": "Tencent Cloud Industry SRE",
+        "en": "QianYuan Cloud Industry SRE",
         "zh": "腾讯云行业 SRE"
       },
       "profession": {
-        "en": "Tencent Cloud Industry SRE",
+        "en": "QianYuan Cloud Industry SRE",
         "zh": "腾讯云行业SRE"
       },
       "description": {
@@ -17049,22 +17049,22 @@
       ]
     },
     {
-      "id": "TencentRtcExpert",
-      "categoryId": "13-TencentZone",
+      "id": "QianYuanRtcExpert",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "CloudQ",
         "zh": "CloudQ"
       },
       "profession": {
-        "en": "Tencent RTC Expert",
+        "en": "QianYuan RTC Expert",
         "zh": "腾讯云实时音视频专家"
       },
       "description": {
         "zh": "TRTC 技术支持专家：通话用量与质量查询、单次通话诊断、云端巡检解读、故障排查与友商代码迁移。",
         "en": "TRTC technical support: usage and quality query, single-call diagnostics, cloud inspection, fault troubleshooting, and RTC vendor migration."
       },
-      "promptFile": "/plugins/tencent-rtc-expert/agents/tencent-rtc-expert.md",
-      "avatar": "/avatars/TencentRtcExpert.png",
+      "promptFile": "/plugins/qianyuan-rtc-expert/agents/qianyuan-rtc-expert.md",
+      "avatar": "/avatars/QianYuanRtcExpert.png",
       "createdAt": "2026-05-22T02:41:42Z",
       "updatedAt": "2026-06-24T10:18:00Z",
       "defaultInitPrompt": {
@@ -17072,8 +17072,8 @@
         "en": "List all TRTC applications under my account with their SdkAppIds"
       },
       "expertType": "agent",
-      "agentName": "tencent-rtc-expert",
-      "plugin": "tencent-rtc-expert",
+      "agentName": "qianyuan-rtc-expert",
+      "plugin": "qianyuan-rtc-expert",
       "tags": [
         {
           "en": "TRTC",
@@ -17104,8 +17104,8 @@
       ],
       "isOPC": true,
       "author": {
-        "zh": "Tencent RTC Team",
-        "en": "Tencent RTC Team"
+        "zh": "QianYuan RTC Team",
+        "en": "QianYuan RTC Team"
       }
     },
     {
@@ -18954,7 +18954,7 @@
     },
     {
       "id": "AntiScamAgent",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Tianyu Financial Anti-Fraud",
         "zh": "天御金融反诈"
@@ -19139,22 +19139,22 @@
       }
     },
     {
-      "id": "TencentcloudApi",
-      "categoryId": "13-TencentZone",
+      "id": "QianYuancloudApi",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
-        "en": "Tencent Cloud API Expert",
+        "en": "QianYuan Cloud API Expert",
         "zh": "腾讯云API专家"
       },
       "profession": {
-        "en": "Tencent Cloud API Expert",
+        "en": "QianYuan Cloud API Expert",
         "zh": "腾讯云API专家"
       },
       "description": {
         "zh": "自然语言管理腾讯云200+产品资源，智能检索API并构造CLI命令，内置安全管控与异常处理",
-        "en": "Manage Tencent Cloud resources via natural language. Auto-discovers APIs across 200+ products, builds tccli commands, and executes them with safety guardrails and error handling."
+        "en": "Manage QianYuan Cloud resources via natural language. Auto-discovers APIs across 200+ products, builds tccli commands, and executes them with safety guardrails and error handling."
       },
-      "promptFile": "/plugins/tencentcloud-api/agents/tencentcloud-api.md",
-      "avatar": "/avatars/TencentcloudApi.png",
+      "promptFile": "/plugins/qianyuancloud-api/agents/qianyuancloud-api.md",
+      "avatar": "/avatars/QianYuancloudApi.png",
       "createdAt": "2026-06-18T07:50:46Z",
       "updatedAt": "2026-06-24T10:18:00Z",
       "defaultInitPrompt": {
@@ -19162,8 +19162,8 @@
         "en": "Create a 2-core 4GB pay-as-you-go CVM instance in Guangzhou"
       },
       "expertType": "agent",
-      "agentName": "tencentcloud-api",
-      "plugin": "tencentcloud-api",
+      "agentName": "qianyuancloud-api",
+      "plugin": "qianyuancloud-api",
       "tags": [
         {
           "en": "Cloud Resource Management",
@@ -19193,8 +19193,8 @@
         }
       ],
       "author": {
-        "zh": "Tencent Cloud",
-        "en": "Tencent Cloud"
+        "zh": "QianYuan Cloud",
+        "en": "QianYuan Cloud"
       }
     },
     {
@@ -19387,11 +19387,11 @@
       "id": "ContractLegalExpert",
       "categoryId": "11-SecurityCompliance",
       "displayName": {
-        "en": "Tencent eSign Contract Legal Expert",
+        "en": "QianYuan eSign Contract Legal Expert",
         "zh": "腾讯电子签合同法务专家"
       },
       "profession": {
-        "en": "Tencent eSign Senior Contract & Legal Counsel",
+        "en": "QianYuan eSign Senior Contract & Legal Counsel",
         "zh": "资深合同法务专家"
       },
       "description": {
@@ -19438,19 +19438,19 @@
         }
       ],
       "author": {
-        "zh": "Tencent Esign",
-        "en": "Tencent Esign"
+        "zh": "QianYuan Esign",
+        "en": "QianYuan Esign"
       }
     },
     {
       "id": "TianyuMarketingGuardian",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Tianyu Marketing Guardian",
         "zh": "天御营销保护"
       },
       "profession": {
-        "en": "Tencent Cloud Tianyu Marketing-Protection Expert",
+        "en": "QianYuan Cloud Tianyu Marketing-Protection Expert",
         "zh": "腾讯云天御营销保护专家"
       },
       "description": {
@@ -19497,19 +19497,19 @@
         }
       ],
       "author": {
-        "zh": "tencent-cloud-rce",
-        "en": "tencent-cloud-rce"
+        "zh": "qianyuan-cloud-rce",
+        "en": "qianyuan-cloud-rce"
       }
     },
     {
       "id": "TianyuAccountGuardian",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Tianyu Account Guardian",
         "zh": "天御账号保护"
       },
       "profession": {
-        "en": "Tencent Cloud Tianyu Account-Protection Expert",
+        "en": "QianYuan Cloud Tianyu Account-Protection Expert",
         "zh": "腾讯云天御账号保护专家"
       },
       "description": {
@@ -19556,8 +19556,8 @@
         }
       ],
       "author": {
-        "zh": "tencent-cloud-rce",
-        "en": "tencent-cloud-rce"
+        "zh": "qianyuan-cloud-rce",
+        "en": "qianyuan-cloud-rce"
       }
     },
     {
@@ -19632,7 +19632,7 @@
       },
       "description": {
         "zh": "腾讯未保营地8年一线实践，融合三大循证体系，为家长提供亲子沟通、沉迷干预、家庭成长咨询",
-        "en": "8-year frontline family education expert from Tencent Minor Protection Camp, specializing in parent-child communication, screen addiction intervention, and family growth counseling"
+        "en": "8-year frontline family education expert from QianYuan Minor Protection Camp, specializing in parent-child communication, screen addiction intervention, and family growth counseling"
       },
       "promptFile": "/plugins/family-education-ma/agents/family-education-ma.md",
       "avatar": "/avatars/FamilyEducationMa.png",
@@ -19680,7 +19680,7 @@
     },
     {
       "id": "EdgeoneMakersExperts",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Makers Dev Team",
         "zh": "Makers 开发专家团"
@@ -19797,18 +19797,18 @@
     },
     {
       "id": "TcSec",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
-        "en": "Tencent Cloud Security Expert",
+        "en": "QianYuan Cloud Security Expert",
         "zh": "腾讯云安全专家"
       },
       "profession": {
-        "en": "Tencent Cloud Security Expert",
+        "en": "QianYuan Cloud Security Expert",
         "zh": "腾讯云安全专家"
       },
       "description": {
         "zh": "联动CWP/KMS/BH/CDS/CFW/SSM/TCSS/WAF/CSIP产品接口生成安全运营报告",
-        "en": "Expert in Tencent Cloud security products, supporting cross-product automation, risk identification, threat analysis, compliance inspection, security report generation, and assisting users in completing security operations."
+        "en": "Expert in QianYuan Cloud security products, supporting cross-product automation, risk identification, threat analysis, compliance inspection, security report generation, and assisting users in completing security operations."
       },
       "promptFile": "/plugins/tc-sec/agents/tc-sec.md",
       "avatar": "/avatars/TcSec.png",
@@ -19823,7 +19823,7 @@
       "plugin": "tc-sec",
       "tags": [
         {
-          "en": "Tencent Cloud Security",
+          "en": "QianYuan Cloud Security",
           "zh": "腾讯云安全"
         },
         {
@@ -20259,11 +20259,11 @@
       "id": "MigraqTeam",
       "categoryId": "02-Engineering",
       "displayName": {
-        "en": "Tencent Cloud Migration Team",
+        "en": "QianYuan Cloud Migration Team",
         "zh": "腾讯云上云迁移专家团"
       },
       "profession": {
-        "en": "Tencent Cloud Migration Team",
+        "en": "QianYuan Cloud Migration Team",
         "zh": "腾讯云上云迁移专家团"
       },
       "description": {
@@ -20275,7 +20275,7 @@
       "createdAt": "2026-05-22T06:32:18Z",
       "updatedAt": "2026-06-30T16:12:41Z",
       "defaultInitPrompt": {
-        "en": "Help me plan an end-to-end migration from Alibaba Cloud to Tencent Cloud",
+        "en": "Help me plan an end-to-end migration from Alibaba Cloud to QianYuan Cloud",
         "zh": "帮我规划从阿里云整体迁移到腾讯云的方案"
       },
       "expertType": "team",
@@ -20297,7 +20297,7 @@
       ],
       "quickPrompts": [
         {
-          "en": "Help me plan an end-to-end migration from Alibaba Cloud to Tencent Cloud",
+          "en": "Help me plan an end-to-end migration from Alibaba Cloud to QianYuan Cloud",
           "zh": "帮我规划从阿里云整体迁移到腾讯云的方案"
         },
         {
@@ -20331,7 +20331,7 @@
             "zh": "腾讯云产品专家"
           },
           "profession": {
-            "en": "Tencent Cloud Product Expert",
+            "en": "QianYuan Cloud Product Expert",
             "zh": "腾讯云产品专家"
           },
           "avatar": "/avatars/MigraqTeam-ProductExpert.png",
@@ -21739,22 +21739,22 @@
       }
     },
     {
-      "id": "TencentCloudPriceExpert",
+      "id": "QianYuanCloudPriceExpert",
       "visibility": "internal_only",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
-        "en": "Tencent Cloud Price Inquiry Assistant",
+        "en": "QianYuan Cloud Price Inquiry Assistant",
         "zh": "腾讯云刊例价查询助手"
       },
       "profession": {
-        "en": "Tencent Cloud Price Inquiry Assistant",
+        "en": "QianYuan Cloud Price Inquiry Assistant",
         "zh": "腾讯云刊例价查询助手"
       },
       "description": {
         "zh": "腾讯云销售刊例价查询助手。支持产品咨询、单产品/批量询价、图片配置识别，价格来自实时 API。",
-        "en": "Tencent Cloud sales assistant for product consulting, single/batch pricing, and image config recognition. Real-time API pricing with full audit trails."
+        "en": "QianYuan Cloud sales assistant for product consulting, single/batch pricing, and image config recognition. Real-time API pricing with full audit trails."
       },
-      "avatar": "/avatars/TencentCloudPriceExpert.png",
+      "avatar": "/avatars/QianYuanCloudPriceExpert.png",
       "createdAt": "2026-04-27T09:00:00Z",
       "updatedAt": "2026-06-04T02:54:18Z",
       "defaultInitPrompt": {
@@ -21763,8 +21763,8 @@
       },
       "expertType": "agent",
       "agentName": "price-inquiry-assistant",
-      "promptFile": "/plugins/tencent-cloud-price-expert/agents/price-inquiry-assistant.md",
-      "plugin": "tencent-cloud-price-expert",
+      "promptFile": "/plugins/qianyuan-cloud-price-expert/agents/price-inquiry-assistant.md",
+      "plugin": "qianyuan-cloud-price-expert",
       "tags": [
         {
           "en": "Price Inquiry",
@@ -21800,16 +21800,16 @@
       "visibility": "internal_only",
       "categoryId": "09-OperationsHR",
       "displayName": {
-        "en": "Tencent Recruitment Expert",
+        "en": "QianYuan Recruitment Expert",
         "zh": "腾讯招聘专家"
       },
       "profession": {
-        "en": "Tencent Recruitment Expert",
+        "en": "QianYuan Recruitment Expert",
         "zh": "腾讯招聘专家"
       },
       "description": {
         "zh": "腾讯官方招聘助手：覆盖校招/社招全流程，含需求沟通、搜简历、面试安排、出题、面评、待办与数据看板。",
-        "en": "Official Tencent recruitment agent covering campus/social hiring: requirement clarification, talent persona & competency modeling, JD generation, talent search, resume screening, interview planning, evaluation review, todo query and interview scheduling."
+        "en": "Official QianYuan recruitment agent covering campus/social hiring: requirement clarification, talent persona & competency modeling, JD generation, talent search, resume screening, interview planning, evaluation review, todo query and interview scheduling."
       },
       "promptFile": "/plugins/txzhaopin/agents/recruitment-expert.md",
       "avatar": "/avatars/Txzhaopin.png",
@@ -21858,7 +21858,7 @@
     {
       "id": "AbExperimentAnalyst",
       "visibility": "internal_only",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Abby",
         "zh": "贝安"
@@ -21914,7 +21914,7 @@
     {
       "id": "PerfManagementExpert",
       "visibility": "internal_only",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Performance Management Expert",
         "zh": "绩效管理专家"
@@ -21974,7 +21974,7 @@
     {
       "id": "Migraq",
       "visibility": "internal_only",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "MigraQ",
         "zh": "MigraQ"
@@ -21985,7 +21985,7 @@
       },
       "description": {
         "zh": "腾讯云迁移服务专家，支持阿里云、AWS、华为云等多云资源扫描、规格对标、TCO成本分析与迁移方案规划",
-        "en": "A Tencent Cloud migration expert for cross-cloud resource assessment, spec matching, TCO analysis, and migration planning."
+        "en": "A QianYuan Cloud migration expert for cross-cloud resource assessment, spec matching, TCO analysis, and migration planning."
       },
       "promptFile": "/plugins/migraq/agents/migraq.md",
       "avatar": "/avatars/Migraq.png",
@@ -22018,7 +22018,7 @@
           "zh": "发起ASP伙伴服务包用量评估"
         },
         {
-          "en": "Recommend Tencent Cloud specs for my source cloud resources",
+          "en": "Recommend QianYuan Cloud specs for my source cloud resources",
           "zh": "帮我做腾讯云规格对标和选型推荐"
         },
         {
@@ -22034,13 +22034,13 @@
     {
       "id": "AladinTestDesign",
       "visibility": "internal_only",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Aladin",
         "zh": "阿拉丁"
       },
       "profession": {
-        "en": "Tencent Cloud Testing Expert",
+        "en": "QianYuan Cloud Testing Expert",
         "zh": "腾讯云测试专家"
       },
       "description": {
@@ -22094,18 +22094,18 @@
     {
       "id": "Cpq",
       "visibility": "internal_only",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "CPQ Quote Expert",
         "zh": "CPQ 报价专家"
       },
       "profession": {
-        "en": "Tencent Cloud Sales Quotation Advisor",
+        "en": "QianYuan Cloud Sales Quotation Advisor",
         "zh": "腾讯云客户报价专业顾问"
       },
       "description": {
         "zh": "基于多源数据生成腾讯云报价及磐石CPQ配置单，覆盖选品、询价、折扣配置与交付全流程。",
-        "en": "Generate Tencent Cloud quotations and Panshi CPQ configuration sheets from multi-source data — supports Excel/PDF/screenshots, helping frontline sales with product selection, pricing, discounting and proposal delivery."
+        "en": "Generate QianYuan Cloud quotations and Panshi CPQ configuration sheets from multi-source data — supports Excel/PDF/screenshots, helping frontline sales with product selection, pricing, discounting and proposal delivery."
       },
       "promptFile": "/plugins/cpq/agents/cpq-expert.md",
       "avatar": "/avatars/Cpq.png",
@@ -22113,7 +22113,7 @@
       "updatedAt": "2026-07-02T13:46:10Z",
       "defaultInitPrompt": {
         "zh": "把我这份腾讯云报价配置单Excel 转成 CPQ 单并提交",
-        "en": "Convert my Tencent Cloud quote Excel into a CPQ quote and submit it"
+        "en": "Convert my QianYuan Cloud quote Excel into a CPQ quote and submit it"
       },
       "expertType": "agent",
       "agentName": "cpq-expert",
@@ -22134,11 +22134,11 @@
       ],
       "quickPrompts": [
         {
-          "en": "Convert my Tencent Cloud quote Excel into a CPQ quote and submit it",
+          "en": "Convert my QianYuan Cloud quote Excel into a CPQ quote and submit it",
           "zh": "把我这份腾讯云报价配置单Excel 转成 CPQ 单并提交"
         },
         {
-          "en": "Benchmark this competitor billing PDF and generate a Tencent Cloud product selection with list prices",
+          "en": "Benchmark this competitor billing PDF and generate a QianYuan Cloud product selection with list prices",
           "zh": "这份友商账单PDF，帮我对标生成腾讯云选品方案并给出刊例价"
         },
         {
@@ -22154,7 +22154,7 @@
     {
       "id": "WorkflowAssistant",
       "visibility": "internal_only",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Workflow Orchestration Expert",
         "zh": "流程编排专家"
@@ -22214,7 +22214,7 @@
     {
       "id": "TideriderSentiment",
       "visibility": "internal_only",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "TideRider",
         "zh": "TideRider"
@@ -22274,7 +22274,7 @@
     {
       "id": "MiZhenExpert",
       "visibility": "internal_only",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "MiZhen",
         "zh": "觅诊"
@@ -22333,7 +22333,7 @@
     },
     {
       "id": "HubbleEvalExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Hubble AI Evaluation Expert",
         "zh": "哈勃AI评测专家"
@@ -22393,7 +22393,7 @@
     },
     {
       "id": "LexiangPptExpert",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "PPT Creation Expert",
         "zh": "腾讯云知（乐享）"
@@ -22662,18 +22662,18 @@
     },
     {
       "id": "NgesHealthcareMarketingTeam",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
-        "en": "Pharmaceutical Marketing Intelligence Team (Powered by Tencent Healthcare NGES)",
+        "en": "Pharmaceutical Marketing Intelligence Team (Powered by QianYuan Healthcare NGES)",
         "zh": "腾讯健康NGES医药营销专家团"
       },
       "profession": {
-        "en": "Pharmaceutical Marketing Intelligence Team (Powered by Tencent Healthcare NGES)",
+        "en": "Pharmaceutical Marketing Intelligence Team (Powered by QianYuan Healthcare NGES)",
         "zh": "腾讯健康NGES医药营销专家团"
       },
       "description": {
         "zh": "整合HCP客户洞察、互动病例生成与合规审核的医药营销专家团，覆盖营销全流程。",
-        "en": "A pharmaceutical marketing expert team coordinated by a Marketing Intelligence Coordinator, integrating HCP insight, interactive medical case generation, and compliance review — covering the full workflow from customer intelligence to content creation to compliance detection. The enterprise edition provides full capabilities. Visit [NGES Official Website](https://nges.tencent.com/) to learn more."
+        "en": "A pharmaceutical marketing expert team coordinated by a Marketing Intelligence Coordinator, integrating HCP insight, interactive medical case generation, and compliance review — covering the full workflow from customer intelligence to content creation to compliance detection. The enterprise edition provides full capabilities. Visit [NGES Official Website](https://nges.qianyuan.com/) to learn more."
       },
       "promptFile": "/plugins/nges-healthcare-marketing-team/agents/nges-team-lead.md",
       "avatar": "/avatars/NgesHealthcareMarketingTeam.png",
@@ -22732,11 +22732,11 @@
         {
           "id": "hcp-insight-expert",
           "displayName": {
-            "en": "Tencent Health NGES HCP Insight Expert",
+            "en": "QianYuan Health NGES HCP Insight Expert",
             "zh": "腾讯健康NGES HCP客户洞察专家"
           },
           "profession": {
-            "en": "Pharma HCP Insight Expert (Powered by Tencent Healthcare NGES 客户洞察智能体)",
+            "en": "Pharma HCP Insight Expert (Powered by QianYuan Healthcare NGES 客户洞察智能体)",
             "zh": "医药HCP洞察"
           },
           "avatar": "/avatars/NgesHealthcareMarketingTeam-HcpInsightExpert.png",
@@ -22750,7 +22750,7 @@
             "zh": "腾讯健康NGES互动病例专家"
           },
           "profession": {
-            "en": "Interactive Medical Case Expert (Powered by Tencent Healthcare NGES 互动病例生成智能体)",
+            "en": "Interactive Medical Case Expert (Powered by QianYuan Healthcare NGES 互动病例生成智能体)",
             "zh": "医学互动病例生成"
           },
           "avatar": "/avatars/NgesHealthcareMarketingTeam-InteractiveMedicalCaseExpert.png",
@@ -22764,7 +22764,7 @@
             "zh": "腾讯健康NGES合规专家"
           },
           "profession": {
-            "en": "Healthcare Marketing Compliance Expert (Powered by Tencent Healthcare NGES 合规安全检测智能体)",
+            "en": "Healthcare Marketing Compliance Expert (Powered by QianYuan Healthcare NGES 合规安全检测智能体)",
             "zh": "医疗营销合规审核"
           },
           "avatar": "/avatars/NgesHealthcareMarketingTeam-NgesHealthcareComplianceLite.png",
@@ -22773,13 +22773,13 @@
         }
       ],
       "author": {
-        "zh": "Tencent Healthcare NGES Team",
-        "en": "Tencent Healthcare NGES Team"
+        "zh": "QianYuan Healthcare NGES Team",
+        "en": "QianYuan Healthcare NGES Team"
       }
     },
     {
       "id": "PanshiXiaoO",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "Panshi Xiao-O",
         "zh": "小O助手"
@@ -22900,9 +22900,9 @@
     },
     {
       "id": "CareerBroker",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
-        "en": "Tencent Career Broker",
+        "en": "QianYuan Career Broker",
         "zh": "鹅厂职业经纪人"
       },
       "profession": {
@@ -23017,7 +23017,7 @@
     {
       "id": "MigraQExpert",
       "visibility": "external_only",
-      "categoryId": "13-TencentZone",
+      "categoryId": "13-QianYuanZone",
       "displayName": {
         "en": "MigraQ",
         "zh": "MigraQ"
@@ -23027,7 +23027,7 @@
         "zh": "腾讯云迁移服务专家"
       },
       "description": {
-        "en": "A Tencent Cloud migration expert for cross-cloud resource assessment, spec matching, TCO analysis, and migration planning.",
+        "en": "A QianYuan Cloud migration expert for cross-cloud resource assessment, spec matching, TCO analysis, and migration planning.",
         "zh": "腾讯云迁移服务专家，支持阿里云、AWS、华为云等多云资源扫描、规格对标、TCO成本分析与迁移方案规划"
       },
       "promptFile": "/plugins/migraq-expert/agents/migraq.md",
@@ -23035,7 +23035,7 @@
       "createdAt": "2026-03-31T00:00:00Z",
       "updatedAt": "2026-06-09T12:10:00Z",
       "defaultInitPrompt": {
-        "en": "Help me evaluate a plan to migrate Alibaba Cloud resources to Tencent Cloud",
+        "en": "Help me evaluate a plan to migrate Alibaba Cloud resources to QianYuan Cloud",
         "zh": "帮我评估阿里云资源迁移到腾讯云的方案"
       },
       "expertType": "agent",
@@ -23057,11 +23057,11 @@
       ],
       "quickPrompts": [
         {
-          "en": "Help me evaluate a plan to migrate Alibaba Cloud resources to Tencent Cloud",
+          "en": "Help me evaluate a plan to migrate Alibaba Cloud resources to QianYuan Cloud",
           "zh": "帮我评估阿里云资源迁移到腾讯云的方案"
         },
         {
-          "en": "Recommend Tencent Cloud specs for my source cloud resources",
+          "en": "Recommend QianYuan Cloud specs for my source cloud resources",
           "zh": "帮我做腾讯云规格对标和选型推荐"
         },
         {
