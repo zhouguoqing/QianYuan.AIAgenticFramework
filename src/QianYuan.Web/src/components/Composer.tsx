@@ -285,17 +285,17 @@ export function Composer({
       {panel && <div className={`composer-popover ${panel}-panel`}>
         {panel === 'add' && <>
           <button className="popover-row" type="button" onClick={openFiles}><span>◎</span><strong>添加文件</strong><em>›</em></button>
-          <button className="popover-row" type="button" onClick={() => setPanel('mode')}><span>✦</span><strong>模式</strong><em>›</em></button>
-          <button className="popover-row" type="button" onClick={() => setPanel('expert')}><span>☷</span><strong>专家</strong><em>›</em></button>
-          <button className="popover-row active" type="button" onClick={() => setPanel('skill')}><span>⌁</span><strong>技能</strong><em>›</em></button>
-          <button className="popover-row" type="button"><span>∞</span><strong>连接器</strong><em>›</em></button>
+          <button className="popover-row" type="button" onClick={() => setPanel('mode')}><span>✦</span><strong>切换模式</strong><em>文生图 / 图生图</em></button>
+          <button className="popover-row" type="button" onClick={() => setPanel('expert')}><span>☷</span><strong>选择专家</strong><em>行业专长</em></button>
+          <button className="popover-row active" type="button" onClick={() => setPanel('skill')}><span>⌁</span><strong>技能选择</strong><em>辅助工具</em></button>
+          <button className="popover-row" type="button"><span>∞</span><strong>连接器</strong><em>第三方服务</em></button>
         </>}
 
         {panel === 'mode' && <>
-          <PanelTitle title="模式" />
-          <ChoiceButton label="聊天" active={mode === 'chat'} onClick={() => { setMode('chat'); setPanel(null) }} />
-          <ChoiceButton label="文生图" active={mode === 'text-to-image'} onClick={() => { setMode('text-to-image'); setPanel(null) }} />
-          <ChoiceButton label="图生图" active={mode === 'image-to-image'} onClick={() => { setMode('image-to-image'); setPanel(null) }} />
+          <PanelTitle title="切换工作模式" hint="输入方式与生成策略" />
+          <ChoiceButton label="文本对话" detail="智能聊天、分析问题、生成内容" active={mode === 'chat'} onClick={() => { setMode('chat'); setPanel(null) }} />
+          <ChoiceButton label="文字转图" detail="根据描述自动生成图像" active={mode === 'text-to-image'} onClick={() => { setMode('text-to-image'); setPanel(null) }} />
+          <ChoiceButton label="图片转图" detail="参考图片并进行改造、优化" active={mode === 'image-to-image'} onClick={() => { setMode('image-to-image'); setPanel(null) }} />
         </>}
 
         {panel === 'workspace' && <>
@@ -312,7 +312,7 @@ export function Composer({
           </div>
 
           <button className="workspace-row" type="button" onClick={() => chooseWorkspace(workspace || workspaceRoots[0]?.id || '')}>
-            <span className="workspace-row-icon" aria-hidden="true">□</span>
+            <span className="workspace-row-icon" aria-hidden="true">★</span>
             <span className="workspace-row-text" title={workspaceLabel}>{workspaceLabel}</span>
           </button>
 
@@ -320,18 +320,19 @@ export function Composer({
 
           <button className="workspace-row action" type="button" onClick={chooseLocalWorkspace}>
             <span className="workspace-row-icon" aria-hidden="true">+</span>
-            <span className="workspace-row-text">新建工作空间</span>
+            <span className="workspace-row-text">创建新工作空间</span>
           </button>
 
           <button className="workspace-row action" type="button" onClick={chooseLocalWorkspace}>
-            <span className="workspace-row-icon" aria-hidden="true">□</span>
+            <span className="workspace-row-icon" aria-hidden="true">📁</span>
             <span className="workspace-row-text">打开本地文件夹</span>
           </button>
         </>}
 
         {panel === 'permission' && <>
           <div className="permission-panel-body">
-            <p>当前权限为允许完全访问，请注意数据安全，建议执行可信任的任务。</p>
+            <PanelTitle title="权限管理" hint="数据安全与操作控制" />
+            <p style={{ fontSize: '10px', color: '#666', margin: '4px 0', lineHeight: '1.4' }}>当前权限为完全访问。建议对不可信任的任务进行权限限制。</p>
             <div className="permission-divider" />
             <label className="permission-toggle-row">
               <span>允许完全访问</span>
@@ -345,19 +346,20 @@ export function Composer({
         </>}
 
         {panel === 'model' && <>
-          <PanelTitle title="模型选择" hint="云端服务 · 默认 Auto" />
-          <ChoiceButton label="Auto" detail="由云端服务和 Agent 配置自动选择" active={!selectedProvider && !selectedModel} onClick={() => setSelectedModel(null, null)} />
+          <PanelTitle title="选择 AI 模型" hint="云端智能引擎" />
+          <ChoiceButton label="Auto" detail="自动选择最适配的模型" active={!selectedProvider && !selectedModel} onClick={() => setSelectedModel(null, null)} />
           {modelOptions.map(item => <ChoiceButton key={`${item.providerId}-${item.modelName}`} label={item.modelName} detail={item.providerId} active={selectedProvider === item.providerId && selectedModel === item.modelName} onClick={() => setSelectedModel(item.providerId, item.modelName)} />)}
         </>}
 
         {panel === 'expert' && <>
-          <PanelTitle title="使用专家" />
-          <ChoiceButton label="默认助理" detail="不指定专家" active={!selectedAgent} onClick={() => { onAgentChange?.(null); setPanel(null) }} />
+          <PanelTitle title="选择工作助手" hint="专家与助理" />
+          <ChoiceButton label="默认助理" detail="通用 AI 助手，全能型协作" active={!selectedAgent} onClick={() => { onAgentChange?.(null); setPanel(null) }} />
           {agents.map(agent => <ChoiceButton key={agent.id} label={agent.name} detail={agent.description} active={selectedAgent === agent.id} onClick={() => { onAgentChange?.(agent.id); setPanel(null) }} />)}
           {agents.length === 0 && <div className="popover-empty">暂无专家</div>}
         </>}
 
         {panel === 'skill' && <>
+          <PanelTitle title="技能工具库" hint="扩展能力与功能" />
           <div className="skill-choice-list">
             {visibleSkills.map(skill => <button key={skill.id} type="button" className={`skill-choice ${selectedSkills.includes(skill.id) ? 'selected' : ''}`} onClick={() => toggleSkill(skill.id)}>
               <span>{skill.name.slice(0, 1).toUpperCase()}</span>
@@ -368,7 +370,7 @@ export function Composer({
             {visibleSkills.length === 0 && <div className="popover-empty">没有匹配的技能</div>}
           </div>
           <div className="popover-footer">
-            <button type="button" onClick={openFiles}>从本地添加技能</button>
+            <button type="button" onClick={openFiles}>从本地添加</button>
             <button type="button" onClick={onOpenSkillManager}>管理技能</button>
           </div>
         </>}
