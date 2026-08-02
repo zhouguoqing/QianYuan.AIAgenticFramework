@@ -65,13 +65,14 @@ public sealed class ImagesController : ControllerBase
 
         try
         {
-            using var response = await SendGenerationRequestWithRetry(http, endpoint, req, provider, ct).ConfigureAwait(false);
+            var (response, model) = await SendGenerationRequestWithRetry(http, endpoint, req, provider, ct).ConfigureAwait(false);
+            using var responseScope = response;
             var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
                 return StatusCode((int)response.StatusCode, new
                 {
                     error = ExtractProviderError(body),
-                    model = ResolveImageModel(req, provider),
+                    model,
                     provider = provider.ProviderId,
                 });
 
@@ -85,7 +86,7 @@ public sealed class ImagesController : ControllerBase
             return Ok(new ImageGenerationResponse
             {
                 Provider = provider.ProviderId,
-                Model = ResolveImageModel(req, provider),
+                Model = model,
                 Url = url,
                 Base64 = base64,
                 Mime = "image/png",
@@ -119,35 +120,46 @@ public sealed class ImagesController : ControllerBase
             ?? _options.OpenAICompatProviders.FirstOrDefault();
     }
 
-    private async Task<HttpResponseMessage> SendGenerationRequestWithRetry(
+    private async Task<(HttpResponseMessage Response, string Model)> SendGenerationRequestWithRetry(
         HttpClient http,
         string endpoint,
         ImageGenerationRequest req,
         OpenAIProviderOptions provider,
         CancellationToken ct)
     {
-        const int maxAttempts = 2;
-        for (var attempt = 1; ; attempt++)
+        var candidateModels = ImageGenerationModelResolver.GetCandidateModels(req, provider);
+        for (var attempt = 0; attempt < candidateModels.Count; attempt++)
         {
+            var model = candidateModels[attempt];
             try
             {
-                return await SendGenerationRequest(http, endpoint, req, provider, ct).ConfigureAwait(false);
+                var response = await SendGenerationRequest(http, endpoint, req, model, ct).ConfigureAwait(false);
+                var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                if (ShouldRetryWithFallbackModel(response.StatusCode, body, model, attempt, candidateModels.Count))
+                {
+                    response.Dispose();
+                    _logger.LogWarning("Image provider rejected model {Model} with {StatusCode}; retrying with fallback model", model, response.StatusCode);
+                    continue;
+                }
+
+                return (response, model);
             }
-            catch (HttpRequestException ex) when (attempt < maxAttempts && IsConnectionReset(ex))
+            catch (HttpRequestException ex) when (attempt < candidateModels.Count - 1 && IsConnectionReset(ex))
             {
-                _logger.LogWarning(ex, "Image provider reset the connection on attempt {Attempt}; retrying once", attempt);
+                _logger.LogWarning(ex, "Image provider reset the connection on attempt {Attempt}; retrying once", attempt + 1);
             }
         }
+
+        throw new HttpRequestException("Image generation failed after exhausting all candidate models.");
     }
 
     private static async Task<HttpResponseMessage> SendGenerationRequest(
         HttpClient http,
         string endpoint,
         ImageGenerationRequest req,
-        OpenAIProviderOptions provider,
+        string model,
         CancellationToken ct)
     {
-        var model = ResolveImageModel(req, provider);
         var supportsResponseFormat = SupportsResponseFormat(model);
         if (string.Equals(endpoint, "images/edits", StringComparison.OrdinalIgnoreCase))
         {
@@ -228,6 +240,25 @@ public sealed class ImagesController : ControllerBase
     private static string ResolveImageModel(ImageGenerationRequest req, OpenAIProviderOptions provider)
         => string.IsNullOrWhiteSpace(req.Model) ? provider.ImageModel ?? provider.DefaultModel : req.Model;
 
+    private static bool ShouldRetryWithFallbackModel(HttpStatusCode statusCode, string body, string model, int attempt, int candidateCount)
+    {
+        if (attempt >= candidateCount - 1 || !IsGptImageModel(model))
+            return false;
+
+        if (statusCode is not (HttpStatusCode.BadRequest or HttpStatusCode.NotFound or HttpStatusCode.InternalServerError))
+            return false;
+
+        var error = body.ToLowerInvariant();
+        return error.Contains("model", StringComparison.Ordinal)
+            && (error.Contains("not found", StringComparison.Ordinal)
+                || error.Contains("does not exist", StringComparison.Ordinal)
+                || error.Contains("unsupported", StringComparison.Ordinal)
+                || error.Contains("unknown", StringComparison.Ordinal));
+    }
+
+    private static bool IsGptImageModel(string? model)
+        => !string.IsNullOrWhiteSpace(model) && model.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase);
+
     private static bool SupportsResponseFormat(string model)
         => !model.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase);
 
@@ -258,6 +289,28 @@ public sealed class ImagesController : ControllerBase
         {
             return body;
         }
+    }
+}
+
+public static class ImageGenerationModelResolver
+{
+    public static IReadOnlyList<string> GetCandidateModels(ImageGenerationRequest req, OpenAIProviderOptions provider)
+    {
+        var requestedModel = req.Model;
+        var configuredModel = provider.ImageModel ?? provider.DefaultModel;
+        if (!string.IsNullOrWhiteSpace(requestedModel))
+            return string.Equals(requestedModel, "gpt-image-2", StringComparison.OrdinalIgnoreCase)
+                ? new[] { requestedModel, "gpt-image-1" }
+                : new[] { requestedModel };
+
+        if (string.IsNullOrWhiteSpace(configuredModel))
+            return Array.Empty<string>();
+
+        return string.Equals(configuredModel, "gpt-image-2", StringComparison.OrdinalIgnoreCase)
+            ? new[] { configuredModel, "gpt-image-1" }
+            : string.Equals(configuredModel, "gpt-image-1", StringComparison.OrdinalIgnoreCase)
+                ? new[] { configuredModel, "gpt-image-2" }
+                : new[] { configuredModel };
     }
 }
 

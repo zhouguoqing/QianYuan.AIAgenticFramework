@@ -11,6 +11,20 @@ using QianYuan.Core.Streaming;
 
 namespace QianYuan.Providers.OpenAICompat;
 
+public static class OpenAICompatModelResolver
+{
+    public static string ResolveChatModel(string? requestedModel, string defaultModel)
+    {
+        if (string.IsNullOrWhiteSpace(requestedModel))
+            return defaultModel;
+
+        return IsImageGenerationModel(requestedModel) ? defaultModel : requestedModel;
+    }
+
+    public static bool IsImageGenerationModel(string? model)
+        => !string.IsNullOrWhiteSpace(model) && model.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase);
+}
+
 /// <summary>
 /// OpenAI Chat Completions compatible provider.
 /// Supports streaming SSE, multi-part user content (vision), tool calls (including parallel and streamed args).
@@ -235,7 +249,7 @@ public sealed class OpenAICompatProvider : ILlmProvider
 
         var body = new Dictionary<string, object?>
         {
-            ["model"] = request.Options.Model ?? _opts.DefaultModel,
+            ["model"] = OpenAICompatModelResolver.ResolveChatModel(request.Options.Model, _opts.DefaultModel),
             ["messages"] = messages,
             ["stream"] = stream,
         };
