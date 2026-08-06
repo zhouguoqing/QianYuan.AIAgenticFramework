@@ -185,7 +185,11 @@ internal sealed class LoopEngineeringRuntime
     {
         var totalTokens = EstimateTokens(conversation);
         var tokenLimit = ResolveContextTokenLimit(_model, _options.MaxContextTokens);
-        if (tokenLimit <= 0 || totalTokens <= tokenLimit) return conversation;
+        var totalCharacters = EstimateTranscriptCharacters(conversation);
+        var characterLimit = _options.MaxTranscriptCharacters;
+        var exceedsTokenLimit = tokenLimit > 0 && totalTokens > tokenLimit;
+        var exceedsCharacterLimit = characterLimit > 0 && totalCharacters > characterLimit;
+        if (!exceedsTokenLimit && !exceedsCharacterLimit) return conversation;
 
         var split = FindRecentWindowStart(conversation);
         var oldMessages = conversation.Take(split).Where(m => m.Role != ChatRole.System).ToArray();
@@ -193,8 +197,9 @@ internal sealed class LoopEngineeringRuntime
 
         var recent = conversation.Skip(split).ToArray();
         var summary = new StringBuilder();
-        summary.AppendLine("Token-aware compressed conversation history for loop continuity:");
+        summary.AppendLine("Compressed conversation history for loop continuity:");
         summary.AppendLine($"Original estimated tokens: {totalTokens}; target context tokens: {tokenLimit}.");
+        summary.AppendLine($"Original transcript characters: {totalCharacters}; target transcript characters: {characterLimit}.");
         summary.AppendLine("Earlier turns summary:");
         foreach (var (message, index) in oldMessages.Select((message, index) => (message, index)))
         {
@@ -205,10 +210,28 @@ internal sealed class LoopEngineeringRuntime
         return new[] { ChatMessage.System(summary.ToString().TrimEnd()) }.Concat(recent).ToArray();
     }
 
+    private static int EstimateTranscriptCharacters(IEnumerable<ChatMessage> messages)
+    {
+        var total = 0;
+        foreach (var message in messages)
+        {
+            total += message.AsPlainText().Length;
+            foreach (var part in message.Parts)
+            {
+                total += part.Text?.Length ?? 0;
+                total += part.JsonPayload?.Length ?? 0;
+                total += part.DataUrlOrBase64?.Length ?? 0;
+            }
+        }
+
+        return total;
+    }
+
     private int FindRecentWindowStart(IReadOnlyList<ChatMessage> conversation)
     {
         var minMessages = Math.Clamp(_options.MinRecentMessagesToKeep, 1, Math.Max(1, conversation.Count));
-        var minTurns = Math.Max(0, _options.MinRecentTurnsToKeep);
+        var totalUserTurns = conversation.Count(m => m.Role == ChatRole.User);
+        var minTurns = Math.Min(Math.Max(0, _options.MinRecentTurnsToKeep), Math.Max(0, totalUserTurns - 1));
         var userTurns = 0;
         var index = conversation.Count;
 
