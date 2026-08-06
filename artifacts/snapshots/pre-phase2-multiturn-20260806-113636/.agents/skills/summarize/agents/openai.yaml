@@ -1,0 +1,4 @@
+interface:
+  display_name: "Summarize CLI"
+  short_description: "Summarize URLs, files, and media from terminal"
+  default_prompt: "Use summarize CLI to summarize URLs, files, and media with correct model and flags."

@@ -1,0 +1,58 @@
+﻿## main...origin/main [behind 1]
+ M skills-lock.json
+ M src/QianYuan.Api/Controllers/CatalogControllers.cs
+ M src/QianYuan.Api/Controllers/ChatController.cs
+ M src/QianYuan.Api/Controllers/ExpertTeamsController.cs
+ M src/QianYuan.Api/Controllers/ExpertsController.cs
+ M src/QianYuan.Api/Controllers/ImagesController.cs
+ M src/QianYuan.Api/Data/experts/expert-manifest.json
+ M src/QianYuan.Api/Hubs/ChatHub.cs
+ M src/QianYuan.Api/Models/ExpertCatalogModels.cs
+ M src/QianYuan.Api/Models/ExpertTeamModels.cs
+ M src/QianYuan.Api/Models/WorkTaskModels.cs
+ M src/QianYuan.Api/Program.cs
+ M src/QianYuan.Api/Services/ExpertCatalogService.cs
+ M src/QianYuan.Api/Services/ExpertTeamService.cs
+ M src/QianYuan.Api/Services/WorkTaskExecutionHarness.cs
+ M src/QianYuan.Api/Services/WorkTaskService.cs
+ M src/QianYuan.Api/appsettings.json
+ M src/QianYuan.Core/Abstractions/ISkill.cs
+ M src/QianYuan.Core/Abstractions/ISkillManager.cs
+ M src/QianYuan.Data/DataServiceCollectionExtensions.cs
+ M src/QianYuan.Data/Entities/WorkTasks.cs
+ M src/QianYuan.Data/QianYuanDbContext.cs
+ M src/QianYuan.Kernel/ReAct/ReActEngine.cs
+ M src/QianYuan.Kernel/Skills/MarkdownSkill.cs
+ M src/QianYuan.Kernel/Skills/MarkdownSkillLoader.cs
+ M src/QianYuan.Kernel/Skills/SkillManager.cs
+ M src/QianYuan.Web/src/App.tsx
+ M src/QianYuan.Web/src/components/Composer.tsx
+ M src/QianYuan.Web/src/components/ExpertMarketplace.tsx
+ M src/QianYuan.Web/src/components/Sidebar.tsx
+ M src/QianYuan.Web/src/components/SkillsManager.tsx
+ M src/QianYuan.Web/src/components/WorkTasksPanel.tsx
+ M src/QianYuan.Web/src/hooks/useChat.ts
+ M src/QianYuan.Web/src/services/api.ts
+ M src/QianYuan.Web/src/styles.css
+ M src/QianYuan.Web/src/types/api.ts
+?? artifacts/current-working-snapshot-20260803-110837/
+?? artifacts/current-working-snapshot-latest.txt
+?? artifacts/image2-verification/
+?? artifacts/merge-snapshots-latest.txt
+?? artifacts/merge-snapshots/
+?? artifacts/multiturn-phase1-smoke/
+?? docs/PHASE1_EXPERT_IMPLEMENTATION.md
+?? docs/PHASE1_MULTITURN_ACCEPTANCE_REPORT.md
+?? docs/PHASE1_MULTITURN_IMPLEMENTATION.md
+?? docs/PHASE2_EXPERT_TEAM_IMPLEMENTATION.md
+?? docs/PHASE3_SKILL_MARKET_IMPLEMENTATION.md
+?? skills/custom/
+?? src/QianYuan.Api/Data/experts/prompts/
+?? src/QianYuan.Api/Models/SkillMarketModels.cs
+?? src/QianYuan.Api/Services/CustomExpertService.cs
+?? src/QianYuan.Api/Services/ExpertTeamTemplateService.cs
+?? src/QianYuan.Api/Services/SkillMarketplaceService.cs
+?? src/QianYuan.Data/Entities/Conversations.cs
+?? src/QianYuan.Data/Entities/CustomExpert.cs
+?? src/QianYuan.Data/Entities/SkillMarket.cs
+?? src/QianYuan.Data/Services/EfSessionStore.cs

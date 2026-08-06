@@ -5,6 +5,8 @@ using QianYuan.Core.Abstractions;
 using QianYuan.Core.Memory;
 using QianYuan.Core.Models;
 using QianYuan.Core.Streaming;
+using QianYuan.Data.Entities;
+using QianYuan.Data.Repositories;
 
 namespace QianYuan.Api.Controllers;
 
@@ -15,13 +17,23 @@ public sealed class ChatController : ControllerBase
     private readonly IAgentRegistry _agents;
     private readonly ILlmProviderRegistry _providers;
     private readonly ISessionStore _sessions;
+    private readonly IAgentRepository _agentRepository;
     private readonly ILogger<ChatController> _logger;
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
 
-    public ChatController(IAgentRegistry agents, ILlmProviderRegistry providers, ISessionStore sessions, ILogger<ChatController> logger)
+    public ChatController(
+        IAgentRegistry agents,
+        ILlmProviderRegistry providers,
+        ISessionStore sessions,
+        IAgentRepository agentRepository,
+        ILogger<ChatController> logger)
     {
-        _agents = agents; _providers = providers; _sessions = sessions; _logger = logger;
+        _agents = agents;
+        _providers = providers;
+        _sessions = sessions;
+        _agentRepository = agentRepository;
+        _logger = logger;
     }
 
     /// <summary>SSE streaming chat. Each event has a "kind" and a payload matching <see cref="StreamingChunk"/>.</summary>
@@ -32,8 +44,17 @@ public sealed class ChatController : ControllerBase
         Response.Headers["Cache-Control"] = "no-cache, no-transform";
         Response.Headers["X-Accel-Buffering"] = "no";
 
-        var agent = _agents.Get(req.AgentId ?? "qianyuan.default")
-                    ?? _agents.List().FirstOrDefault();
+        var requestedAgentId = req.AgentId ?? "qianyuan.default";
+        var agent = _agents.Get(requestedAgentId);
+        Agent? storeAgent = null;
+        if (agent is null && !string.IsNullOrWhiteSpace(req.AgentId))
+        {
+            storeAgent = await _agentRepository.GetByIdAsync(req.AgentId, ct).ConfigureAwait(false);
+            if (storeAgent?.Enabled == true)
+                agent = _agents.Get("qianyuan.default") ?? _agents.List().FirstOrDefault();
+        }
+
+        agent ??= _agents.List().FirstOrDefault();
         if (agent is null)
         {
             await WriteSse("error", new { message = "no agents registered" }, ct);
@@ -45,17 +66,28 @@ public sealed class ChatController : ControllerBase
                     ?? new SessionState { SessionId = sessionId, AgentId = agent.Id, OwnerId = req.OwnerId };
 
         var messages = state.Messages.ToList();
-        messages.Add(BuildUserMessage(req));
+        if (req.ReuseLastUserMessage)
+        {
+            if (messages.Count == 0 || messages[^1].Role != ChatRole.User)
+            {
+                await WriteSse("error", new { message = "reuseLastUserMessage requires the session to end with a user message" }, ct);
+                return;
+            }
+        }
+        else
+        {
+            messages.Add(BuildUserMessage(req));
+        }
         state.Messages.Clear();
         state.Messages.AddRange(messages);
         state.Title ??= req.UserText is { Length: > 0 } ? Snippet(req.UserText, 40) : null;
         state.AgentId = agent.Id;
 
-        var assistantText = new System.Text.StringBuilder();
+        var transcript = new StreamTranscriptBuilder();
         await WriteSse("session", new { sessionId, agentId = agent.Id }, ct);
 
-        var providerOverride = NormalizeAuto(req.Provider);
-        var modelOverride = NormalizeAuto(req.Model);
+        var providerOverride = NormalizeAuto(req.Provider) ?? NormalizeAuto(storeAgent?.DefaultProviderId);
+        var modelOverride = NormalizeAuto(req.Model) ?? NormalizeAuto(storeAgent?.DefaultModel);
         var resolvedProvider = providerOverride is null ? _providers.Default : _providers.Get(providerOverride);
         if (resolvedProvider is null)
         {
@@ -76,34 +108,170 @@ public sealed class ChatController : ControllerBase
             SessionId = sessionId,
             ModelOverride = modelOverride,
             ProviderOverride = providerOverride,
-            SystemPromptOverride = string.IsNullOrWhiteSpace(req.SystemPrompt) ? null : req.SystemPrompt,
-            PreloadSkills = req.Skills,
+            SystemPromptOverride = BuildSystemPromptOverride(storeAgent, req.SystemPrompt),
+            PreloadSkills = BuildPreloadSkills(storeAgent, req.Skills),
             MaxIterations = req.MaxIterations,
             Metadata = BuildMetadata(req, resolvedProvider.ProviderId, modelOverride ?? resolvedProvider.DefaultModel),
         };
 
+        var streamInterrupted = false;
         try
         {
             await foreach (var chunk in agent.RunAsync(run, ct).ConfigureAwait(false))
             {
-                if (chunk.Kind == StreamingChunkKind.TextDelta && chunk.Text is not null)
-                    assistantText.Append(chunk.Text);
-
+                transcript.Apply(chunk);
                 await WriteSse(SseEventName(chunk.Kind), SerializeChunk(chunk), ct);
             }
         }
-        catch (OperationCanceledException) { return; }
+        catch (OperationCanceledException)
+        {
+            streamInterrupted = true;
+            _logger.LogInformation("chat/stream interrupted for session {SessionId}", sessionId);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "chat/stream failed");
-            await WriteSse("error", new { message = ex.Message }, ct);
+            transcript.Apply(StreamingChunk.Error(ex.Message));
+            await WriteSse("error", new { message = ex.Message }, HttpContext.RequestAborted).ConfigureAwait(false);
         }
 
-        if (assistantText.Length > 0)
-            state.Messages.Add(ChatMessage.Assistant(assistantText.ToString()));
-        await _sessions.SaveAsync(state, ct).ConfigureAwait(false);
+        state.Messages.AddRange(transcript.Complete());
+        await _sessions.SaveAsync(state, streamInterrupted ? CancellationToken.None : ct).ConfigureAwait(false);
 
-        await WriteSse("done", new { sessionId }, ct);
+        if (!streamInterrupted)
+            await WriteSse("done", new { sessionId }, ct).ConfigureAwait(false);
+    }
+
+
+    private static string? BuildSystemPromptOverride(Agent? storeAgent, string? expertPrompt)
+    {
+        var parts = new[] { storeAgent?.SystemPrompt, expertPrompt }
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return parts.Length == 0 ? null : string.Join("\n\n", parts);
+    }
+
+    private static string[]? BuildPreloadSkills(Agent? storeAgent, string[]? requestSkills)
+    {
+        var skills = new List<string>();
+        if (requestSkills is not null) skills.AddRange(requestSkills.Where(s => !string.IsNullOrWhiteSpace(s)));
+        if (storeAgent is not null)
+        {
+            skills.AddRange(storeAgent.Skills
+                .Where(s => s.Enabled && !string.IsNullOrWhiteSpace(s.SkillId))
+                .OrderByDescending(s => s.Priority)
+                .Select(s => s.SkillId));
+        }
+
+        var distinct = skills.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return distinct.Length == 0 ? null : distinct;
+    }
+
+
+    private sealed class StreamTranscriptBuilder
+    {
+        private readonly List<ChatMessage> _messages = [];
+        private readonly System.Text.StringBuilder _assistantText = new();
+        private readonly Dictionary<string, PendingToolMessage> _tools = new(StringComparer.Ordinal);
+
+        public void Apply(StreamingChunk chunk)
+        {
+            switch (chunk.Kind)
+            {
+                case StreamingChunkKind.TextDelta:
+                    if (!string.IsNullOrEmpty(chunk.Text)) _assistantText.Append(chunk.Text);
+                    break;
+                case StreamingChunkKind.ThinkingDelta:
+                    if (!string.IsNullOrEmpty(chunk.Text))
+                        _messages.Add(Message(ChatRole.Assistant, [ContentPart.FromText(chunk.Text)], chunk, "thinking"));
+                    break;
+                case StreamingChunkKind.ToolCallStart:
+                    FlushAssistant(chunk);
+                    if (!string.IsNullOrWhiteSpace(chunk.ToolCallId))
+                    {
+                        _tools[chunk.ToolCallId] = new PendingToolMessage(chunk.ToolCallId, chunk.ToolName ?? string.Empty, chunk.ToolArgsJson ?? string.Empty, chunk);
+                    }
+                    break;
+                case StreamingChunkKind.ToolCallArgsDelta:
+                    if (!string.IsNullOrWhiteSpace(chunk.ToolCallId) && _tools.TryGetValue(chunk.ToolCallId, out var pendingArgs))
+                        pendingArgs.Args.Append(chunk.ToolArgsJson ?? string.Empty);
+                    break;
+                case StreamingChunkKind.ToolCallEnd:
+                    if (!string.IsNullOrWhiteSpace(chunk.ToolCallId) && _tools.TryGetValue(chunk.ToolCallId, out var pending))
+                    {
+                        if (!string.IsNullOrWhiteSpace(chunk.ToolArgsJson))
+                        {
+                            pending.Args.Clear();
+                            pending.Args.Append(chunk.ToolArgsJson);
+                        }
+                        var args = pending.Args.ToString().Trim();
+                        _messages.Add(Message(ChatRole.Assistant, [ContentPart.ToolCall(pending.Id, pending.Name, string.IsNullOrWhiteSpace(args) ? "{}" : args)], chunk, "tool"));
+                        _tools.Remove(chunk.ToolCallId);
+                    }
+                    break;
+                case StreamingChunkKind.ToolObservation:
+                    _messages.Add(Message(ChatRole.Tool, [ContentPart.ToolResult(chunk.ToolCallId ?? Guid.NewGuid().ToString("N"), chunk.Text ?? string.Empty, chunk.Text)], chunk, "observation"));
+                    break;
+                case StreamingChunkKind.Warning:
+                    if (!string.IsNullOrEmpty(chunk.Text))
+                        _messages.Add(Message(ChatRole.Assistant, [ContentPart.FromText(chunk.Text)], chunk, "warning"));
+                    break;
+                case StreamingChunkKind.Error:
+                    if (!string.IsNullOrEmpty(chunk.Text))
+                        _messages.Add(Message(ChatRole.Assistant, [ContentPart.FromText(chunk.Text)], chunk, "error"));
+                    break;
+                case StreamingChunkKind.End:
+                    FlushAssistant(chunk);
+                    break;
+            }
+        }
+
+        public IReadOnlyList<ChatMessage> Complete()
+        {
+            FlushAssistant(null);
+            foreach (var pending in _tools.Values)
+            {
+                var args = pending.Args.ToString().Trim();
+                _messages.Add(Message(ChatRole.Assistant, [ContentPart.ToolCall(pending.Id, pending.Name, string.IsNullOrWhiteSpace(args) ? "{}" : args)], pending.Source, "tool"));
+            }
+            _tools.Clear();
+            return _messages;
+        }
+
+        private void FlushAssistant(StreamingChunk? chunk)
+        {
+            if (_assistantText.Length == 0) return;
+            _messages.Add(Message(ChatRole.Assistant, [ContentPart.FromText(_assistantText.ToString())], chunk, "assistant"));
+            _assistantText.Clear();
+        }
+
+        private static ChatMessage Message(ChatRole role, IReadOnlyList<ContentPart> parts, StreamingChunk? chunk, string displayKind)
+        {
+            var meta = new Dictionary<string, string> { ["displayKind"] = displayKind };
+            if (!string.IsNullOrWhiteSpace(chunk?.AgentId)) meta["agentId"] = chunk.AgentId!;
+            if (!string.IsNullOrWhiteSpace(chunk?.SkillId)) meta["skillId"] = chunk.SkillId!;
+            if (!string.IsNullOrWhiteSpace(chunk?.ToolName)) meta["toolName"] = chunk.ToolName!;
+            if (chunk?.Step is int step) meta["step"] = step.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return new ChatMessage { Role = role, Parts = parts, Meta = meta };
+        }
+
+        private sealed class PendingToolMessage
+        {
+            public PendingToolMessage(string id, string name, string args, StreamingChunk source)
+            {
+                Id = id;
+                Name = name;
+                Args = new System.Text.StringBuilder(args);
+                Source = source;
+            }
+
+            public string Id { get; }
+            public string Name { get; }
+            public System.Text.StringBuilder Args { get; }
+            public StreamingChunk Source { get; }
+        }
     }
 
     private async Task WriteSse(string eventName, object data, CancellationToken ct)
@@ -197,6 +365,7 @@ public sealed class ChatStreamRequest
     public string? SessionId { get; set; }
     public string? OwnerId { get; set; }
     public string? UserText { get; set; }
+    public bool ReuseLastUserMessage { get; set; }
     public ImagePart[]? Images { get; set; }
     public string? Provider { get; set; }
     public string? Model { get; set; }

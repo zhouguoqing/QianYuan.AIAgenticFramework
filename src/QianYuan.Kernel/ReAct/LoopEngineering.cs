@@ -19,7 +19,9 @@ public sealed class LoopEngineeringOptions
     public bool EnableToolCallBudget { get; init; } = true;
     public bool IncludeLoopStateInPrompt { get; init; } = true;
     public int MaxTranscriptCharacters { get; init; } = 80_000;
+    public int MaxContextTokens { get; init; } = 24_000;
     public int MinRecentMessagesToKeep { get; init; } = 12;
+    public int MinRecentTurnsToKeep { get; init; } = 6;
     public int MaxCompressedMessageCharacters { get; init; } = 320;
     public int MaxObservationCharacters { get; init; } = 12_000;
     public int MaxConsecutiveIdenticalToolCalls { get; init; } = 1;
@@ -30,14 +32,18 @@ public sealed class LoopEngineeringOptions
 internal sealed class LoopEngineeringRuntime
 {
     private readonly LoopEngineeringOptions _options;
+    private readonly ITokenCounter _tokenCounter;
+    private readonly string? _model;
     private readonly Dictionary<string, int> _toolCallCounts = new(StringComparer.Ordinal);
     private string? _lastToolSignature;
     private int _lastToolSignatureCount;
     private int _totalToolCalls;
 
-    public LoopEngineeringRuntime(LoopEngineeringOptions? options)
+    public LoopEngineeringRuntime(LoopEngineeringOptions? options, ITokenCounter? tokenCounter = null, string? model = null)
     {
         _options = options ?? new LoopEngineeringOptions();
+        _tokenCounter = tokenCounter ?? new HeuristicTokenCounter();
+        _model = model;
     }
 
     public LoopEngineeringOptions Options => _options;
@@ -177,47 +183,85 @@ internal sealed class LoopEngineeringRuntime
 
     private IReadOnlyList<ChatMessage> CompressConversationIfNeeded(IReadOnlyList<ChatMessage> conversation)
     {
-        var total = EstimateCharacters(conversation);
-        if (_options.MaxTranscriptCharacters <= 0 || total <= _options.MaxTranscriptCharacters) return conversation;
+        var totalTokens = EstimateTokens(conversation);
+        var tokenLimit = ResolveContextTokenLimit(_model, _options.MaxContextTokens);
+        if (tokenLimit <= 0 || totalTokens <= tokenLimit) return conversation;
 
-        var keepCount = Math.Clamp(_options.MinRecentMessagesToKeep, 1, conversation.Count);
-        var split = Math.Max(0, conversation.Count - keepCount);
+        var split = FindRecentWindowStart(conversation);
         var oldMessages = conversation.Take(split).Where(m => m.Role != ChatRole.System).ToArray();
         if (oldMessages.Length == 0) return conversation;
 
         var recent = conversation.Skip(split).ToArray();
         var summary = new StringBuilder();
-        summary.AppendLine("Compressed conversation history for loop continuity:");
+        summary.AppendLine("Token-aware compressed conversation history for loop continuity:");
+        summary.AppendLine($"Original estimated tokens: {totalTokens}; target context tokens: {tokenLimit}.");
+        summary.AppendLine("Earlier turns summary:");
         foreach (var (message, index) in oldMessages.Select((message, index) => (message, index)))
         {
-            var text = message.AsPlainText();
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                var toolCalls = message.Parts.Where(p => p.Kind == ContentKind.ToolCall)
-                    .Select(p => $"tool_call:{p.Name}#{p.ToolCallId}");
-                var toolResults = message.Parts.Where(p => p.Kind == ContentKind.ToolResult)
-                    .Select(p => $"tool_result:{p.ToolCallId}");
-                text = string.Join(", ", toolCalls.Concat(toolResults));
-            }
+            var text = SummarizeMessageForCompression(message);
             summary.AppendLine($"- {index + 1}. {message.Role}: {Truncate(text, _options.MaxCompressedMessageCharacters)}");
         }
 
         return new[] { ChatMessage.System(summary.ToString().TrimEnd()) }.Concat(recent).ToArray();
     }
 
-    private static int EstimateCharacters(IEnumerable<ChatMessage> messages)
+    private int FindRecentWindowStart(IReadOnlyList<ChatMessage> conversation)
+    {
+        var minMessages = Math.Clamp(_options.MinRecentMessagesToKeep, 1, Math.Max(1, conversation.Count));
+        var minTurns = Math.Max(0, _options.MinRecentTurnsToKeep);
+        var userTurns = 0;
+        var index = conversation.Count;
+
+        while (index > 0)
+        {
+            index--;
+            if (conversation[index].Role == ChatRole.User) userTurns++;
+            var keptMessages = conversation.Count - index;
+            if (keptMessages >= minMessages && userTurns >= minTurns) break;
+        }
+
+        return Math.Clamp(index, 0, conversation.Count);
+    }
+
+    private int EstimateTokens(IEnumerable<ChatMessage> messages)
     {
         var total = 0;
         foreach (var message in messages)
         {
-            total += message.AsPlainText().Length;
+            total += 4;
+            total += _tokenCounter.CountText(message.AsPlainText(), _model);
             foreach (var part in message.Parts)
             {
-                total += part.JsonPayload?.Length ?? 0;
-                total += part.DataUrlOrBase64?.Length ?? 0;
+                total += _tokenCounter.CountText(part.JsonPayload, _model);
+                total += string.IsNullOrEmpty(part.DataUrlOrBase64) ? 0 : Math.Min(4096, part.DataUrlOrBase64.Length / 4);
             }
         }
         return total;
+    }
+
+    private static int ResolveContextTokenLimit(string? model, int configured)
+    {
+        if (configured > 0) return configured;
+        if (string.IsNullOrWhiteSpace(model)) return 24_000;
+        var normalized = model.ToLowerInvariant();
+        if (normalized.Contains("gemini")) return 800_000;
+        if (normalized.Contains("claude")) return 160_000;
+        if (normalized.Contains("gpt-4") || normalized.Contains("gpt-5")) return 96_000;
+        return 24_000;
+    }
+
+    private static string SummarizeMessageForCompression(ChatMessage message)
+    {
+        var text = message.AsPlainText();
+        if (!string.IsNullOrWhiteSpace(text)) return text;
+
+        var toolCalls = message.Parts.Where(p => p.Kind == ContentKind.ToolCall)
+            .Select(p => $"tool_call:{p.Name}#{p.ToolCallId} args={p.JsonPayload}");
+        var toolResults = message.Parts.Where(p => p.Kind == ContentKind.ToolResult)
+            .Select(p => $"tool_result:{p.ToolCallId} {p.Text ?? p.JsonPayload}");
+        var media = message.Parts.Where(p => p.Kind is ContentKind.Image or ContentKind.Audio or ContentKind.File)
+            .Select(p => $"{p.Kind}:{p.MimeType ?? p.Name ?? "attachment"}");
+        return string.Join(", ", toolCalls.Concat(toolResults).Concat(media));
     }
 
     private static string BuildToolSignature(string toolName, string argumentsJson)

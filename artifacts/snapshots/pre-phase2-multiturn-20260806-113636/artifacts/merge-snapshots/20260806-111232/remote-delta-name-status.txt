@@ -1,0 +1,7 @@
+﻿A	.workbuddy/memory/2026-07-27.md
+A	artifacts/carrier-product-review-report.md
+A	skills/carrier-product-review/SKILL.md
+M	src/QianYuan.Api/Controllers/ImagesController.cs
+M	src/QianYuan.Api/appsettings.json
+M	src/QianYuan.Providers.OpenAICompat/OpenAICompatProvider.cs
+A	tests/QianYuan.Core.Tests/ImageGenerationTests.cs

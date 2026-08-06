@@ -1,0 +1,1 @@
+﻿12f0107 support Text2Image

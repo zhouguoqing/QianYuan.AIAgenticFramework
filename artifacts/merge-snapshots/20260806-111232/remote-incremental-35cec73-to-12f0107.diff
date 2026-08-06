@@ -1,0 +1,241 @@
+﻿diff --git a/src/QianYuan.Api/Controllers/ImagesController.cs b/src/QianYuan.Api/Controllers/ImagesController.cs
+index c797805..54c5226 100644
+--- a/src/QianYuan.Api/Controllers/ImagesController.cs
++++ b/src/QianYuan.Api/Controllers/ImagesController.cs
+@@ -65,13 +65,14 @@ public sealed class ImagesController : ControllerBase
+ 
+         try
+         {
+-            using var response = await SendGenerationRequestWithRetry(http, endpoint, req, provider, ct).ConfigureAwait(false);
++            var (response, model) = await SendGenerationRequestWithRetry(http, endpoint, req, provider, ct).ConfigureAwait(false);
++            using var responseScope = response;
+             var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+             if (!response.IsSuccessStatusCode)
+                 return StatusCode((int)response.StatusCode, new
+                 {
+                     error = ExtractProviderError(body),
+-                    model = ResolveImageModel(req, provider),
++                    model,
+                     provider = provider.ProviderId,
+                 });
+ 
+@@ -85,7 +86,7 @@ public sealed class ImagesController : ControllerBase
+             return Ok(new ImageGenerationResponse
+             {
+                 Provider = provider.ProviderId,
+-                Model = ResolveImageModel(req, provider),
++                Model = model,
+                 Url = url,
+                 Base64 = base64,
+                 Mime = "image/png",
+@@ -119,35 +120,46 @@ public sealed class ImagesController : ControllerBase
+             ?? _options.OpenAICompatProviders.FirstOrDefault();
+     }
+ 
+-    private async Task<HttpResponseMessage> SendGenerationRequestWithRetry(
++    private async Task<(HttpResponseMessage Response, string Model)> SendGenerationRequestWithRetry(
+         HttpClient http,
+         string endpoint,
+         ImageGenerationRequest req,
+         OpenAIProviderOptions provider,
+         CancellationToken ct)
+     {
+-        const int maxAttempts = 2;
+-        for (var attempt = 1; ; attempt++)
++        var candidateModels = ImageGenerationModelResolver.GetCandidateModels(req, provider);
++        for (var attempt = 0; attempt < candidateModels.Count; attempt++)
+         {
++            var model = candidateModels[attempt];
+             try
+             {
+-                return await SendGenerationRequest(http, endpoint, req, provider, ct).ConfigureAwait(false);
++                var response = await SendGenerationRequest(http, endpoint, req, model, ct).ConfigureAwait(false);
++                var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
++                if (ShouldRetryWithFallbackModel(response.StatusCode, body, model, attempt, candidateModels.Count))
++                {
++                    response.Dispose();
++                    _logger.LogWarning("Image provider rejected model {Model} with {StatusCode}; retrying with fallback model", model, response.StatusCode);
++                    continue;
++                }
++
++                return (response, model);
+             }
+-            catch (HttpRequestException ex) when (attempt < maxAttempts && IsConnectionReset(ex))
++            catch (HttpRequestException ex) when (attempt < candidateModels.Count - 1 && IsConnectionReset(ex))
+             {
+-                _logger.LogWarning(ex, "Image provider reset the connection on attempt {Attempt}; retrying once", attempt);
++                _logger.LogWarning(ex, "Image provider reset the connection on attempt {Attempt}; retrying once", attempt + 1);
+             }
+         }
++
++        throw new HttpRequestException("Image generation failed after exhausting all candidate models.");
+     }
+ 
+     private static async Task<HttpResponseMessage> SendGenerationRequest(
+         HttpClient http,
+         string endpoint,
+         ImageGenerationRequest req,
+-        OpenAIProviderOptions provider,
++        string model,
+         CancellationToken ct)
+     {
+-        var model = ResolveImageModel(req, provider);
+         var supportsResponseFormat = SupportsResponseFormat(model);
+         if (string.Equals(endpoint, "images/edits", StringComparison.OrdinalIgnoreCase))
+         {
+@@ -228,6 +240,25 @@ public sealed class ImagesController : ControllerBase
+     private static string ResolveImageModel(ImageGenerationRequest req, OpenAIProviderOptions provider)
+         => string.IsNullOrWhiteSpace(req.Model) ? provider.ImageModel ?? provider.DefaultModel : req.Model;
+ 
++    private static bool ShouldRetryWithFallbackModel(HttpStatusCode statusCode, string body, string model, int attempt, int candidateCount)
++    {
++        if (attempt >= candidateCount - 1 || !IsGptImageModel(model))
++            return false;
++
++        if (statusCode is not (HttpStatusCode.BadRequest or HttpStatusCode.NotFound or HttpStatusCode.InternalServerError))
++            return false;
++
++        var error = body.ToLowerInvariant();
++        return error.Contains("model", StringComparison.Ordinal)
++            && (error.Contains("not found", StringComparison.Ordinal)
++                || error.Contains("does not exist", StringComparison.Ordinal)
++                || error.Contains("unsupported", StringComparison.Ordinal)
++                || error.Contains("unknown", StringComparison.Ordinal));
++    }
++
++    private static bool IsGptImageModel(string? model)
++        => !string.IsNullOrWhiteSpace(model) && model.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase);
++
+     private static bool SupportsResponseFormat(string model)
+         => !model.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase);
+ 
+@@ -261,6 +292,28 @@ public sealed class ImagesController : ControllerBase
+     }
+ }
+ 
++public static class ImageGenerationModelResolver
++{
++    public static IReadOnlyList<string> GetCandidateModels(ImageGenerationRequest req, OpenAIProviderOptions provider)
++    {
++        var requestedModel = req.Model;
++        var configuredModel = provider.ImageModel ?? provider.DefaultModel;
++        if (!string.IsNullOrWhiteSpace(requestedModel))
++            return string.Equals(requestedModel, "gpt-image-2", StringComparison.OrdinalIgnoreCase)
++                ? new[] { requestedModel, "gpt-image-1" }
++                : new[] { requestedModel };
++
++        if (string.IsNullOrWhiteSpace(configuredModel))
++            return Array.Empty<string>();
++
++        return string.Equals(configuredModel, "gpt-image-2", StringComparison.OrdinalIgnoreCase)
++            ? new[] { configuredModel, "gpt-image-1" }
++            : string.Equals(configuredModel, "gpt-image-1", StringComparison.OrdinalIgnoreCase)
++                ? new[] { configuredModel, "gpt-image-2" }
++                : new[] { configuredModel };
++    }
++}
++
+ public sealed class ImageGenerationRequest
+ {
+     public string Mode { get; set; } = "text-to-image";
+diff --git a/src/QianYuan.Api/appsettings.json b/src/QianYuan.Api/appsettings.json
+index 4afc109..66fddf1 100644
+--- a/src/QianYuan.Api/appsettings.json
++++ b/src/QianYuan.Api/appsettings.json
+@@ -33,7 +33,7 @@
+         "ImageModel": "gpt-image-2",
+         "SupportsVision": true,
+         "SupportsSamplingParams": false,
+-        "Models": [ "gpt-image-2", "gpt-5.5" ]
++        "Models": [ "gpt-image-1", "gpt-image-2", "gpt-5.5" ]
+       },
+       {
+         "ProviderId": "kimi",
+diff --git a/src/QianYuan.Providers.OpenAICompat/OpenAICompatProvider.cs b/src/QianYuan.Providers.OpenAICompat/OpenAICompatProvider.cs
+index 9f299b3..e662f14 100644
+--- a/src/QianYuan.Providers.OpenAICompat/OpenAICompatProvider.cs
++++ b/src/QianYuan.Providers.OpenAICompat/OpenAICompatProvider.cs
+@@ -11,6 +11,20 @@ using QianYuan.Core.Streaming;
+ 
+ namespace QianYuan.Providers.OpenAICompat;
+ 
++public static class OpenAICompatModelResolver
++{
++    public static string ResolveChatModel(string? requestedModel, string defaultModel)
++    {
++        if (string.IsNullOrWhiteSpace(requestedModel))
++            return defaultModel;
++
++        return IsImageGenerationModel(requestedModel) ? defaultModel : requestedModel;
++    }
++
++    public static bool IsImageGenerationModel(string? model)
++        => !string.IsNullOrWhiteSpace(model) && model.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase);
++}
++
+ /// <summary>
+ /// OpenAI Chat Completions compatible provider.
+ /// Supports streaming SSE, multi-part user content (vision), tool calls (including parallel and streamed args).
+@@ -235,7 +249,7 @@ public sealed class OpenAICompatProvider : ILlmProvider
+ 
+         var body = new Dictionary<string, object?>
+         {
+-            ["model"] = request.Options.Model ?? _opts.DefaultModel,
++            ["model"] = OpenAICompatModelResolver.ResolveChatModel(request.Options.Model, _opts.DefaultModel),
+             ["messages"] = messages,
+             ["stream"] = stream,
+         };
+diff --git a/tests/QianYuan.Core.Tests/ImageGenerationTests.cs b/tests/QianYuan.Core.Tests/ImageGenerationTests.cs
+new file mode 100644
+index 0000000..ddea6df
+--- /dev/null
++++ b/tests/QianYuan.Core.Tests/ImageGenerationTests.cs
+@@ -0,0 +1,48 @@
++using FluentAssertions;
++using QianYuan.Api.Configuration;
++using QianYuan.Api.Controllers;
++using QianYuan.Providers.OpenAICompat;
++using Xunit;
++
++namespace QianYuan.Core.Tests;
++
++public class ImageGenerationTests
++{
++    [Fact]
++    public void GetCandidateModels_ForGptImage2_ShouldIncludeFallbackGptImage1()
++    {
++        var req = new ImageGenerationRequest { Model = "gpt-image-2" };
++        var provider = new OpenAIProviderOptions { ImageModel = "gpt-image-1" };
++
++        var candidates = ImageGenerationModelResolver.GetCandidateModels(req, provider);
++
++        candidates.Should().Equal("gpt-image-2", "gpt-image-1");
++    }
++
++    [Fact]
++    public void GetCandidateModels_ForNonGptImageModel_ShouldReturnSingleModel()
++    {
++        var req = new ImageGenerationRequest { Model = "gpt-4o-mini" };
++        var provider = new OpenAIProviderOptions();
++
++        var candidates = ImageGenerationModelResolver.GetCandidateModels(req, provider);
++
++        candidates.Should().Equal("gpt-4o-mini");
++    }
++
++    [Fact]
++    public void ResolveChatModel_ForGptImage2_ShouldFallbackToDefaultChatModel()
++    {
++        var resolved = OpenAICompatModelResolver.ResolveChatModel("gpt-image-2", "gpt-5.5");
++
++        resolved.Should().Be("gpt-5.5");
++    }
++
++    [Fact]
++    public void ResolveChatModel_ForRegularModel_ShouldKeepRequestedModel()
++    {
++        var resolved = OpenAICompatModelResolver.ResolveChatModel("gpt-4o-mini", "gpt-5.5");
++
++        resolved.Should().Be("gpt-4o-mini");
++    }
++}

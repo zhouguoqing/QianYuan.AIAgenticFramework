@@ -1,14 +1,19 @@
 import type {
   ChunkDto, StreamRequest, ImageGenerationRequest, ImageGenerationResponse,
   AgentDto, SkillManifestDto, SkillToolsResponse, McpStdioRegistrationRequest,
-  ProvidersResponse, SessionSummaryDto, KnowledgeDocument, KnowledgeSearchResult,
+  SkillCategoryDto, SkillPackageDto, SkillMarketEntryDto, InstalledSkillDto,
+  InstallSkillRequest, CreateSkillRequest,
+  ProvidersResponse, SessionSummaryDto, SessionStateDto, SessionCreateRequest, SessionUpdateRequest, SessionRegenerateRequest, KnowledgeDocument, KnowledgeSearchResult,
   AgentStoreAgentDto, CreateAgentStoreAgentRequest, AddAgentSkillRequest,
   AddAgentMcpServerRequest, AddAgentCliServiceRequest, AgentStoreToolDto,
   AgentInteractChunk, AuthResponse, AuthUserDto, LoginRequest, RegisterRequest,
   CreditWalletDto, CreditTransactionDto, SubscriptionPlanDto, EstimateCreditsRequest, EstimateCreditsResponse,
   CreateWorkTaskRequest, WorkTaskDetailDto, WorkTaskDto, WorkArtifactDto,
-  ExpertTeamDto, WorkTaskRuntimeDto,
+  ExpertTeamDto, WorkTaskRuntimeDto, ExpertTeamTemplateDto, CreateExpertTeamRequest,
+  UpdateExpertTeamRequest, CreateExpertTeamMemberRequest, UpdateExpertTeamMemberRequest,
+  ExpertTeamMemberDto, ExpertTeamExecutionEventDto,
   ExpertCategoryDto, ExpertScenarioDto, ExpertListResultDto, ExpertDetailDto, ExpertPromptDto,
+  CustomExpertUpsertRequest, ExpertChatRequest, ExpertChatResponse,
 } from '../types/api'
 
 const API_ROOT = globalThis.window?.workpartner?.apiBaseUrl?.replace(/\/$/, '')
@@ -114,6 +119,48 @@ export async function listExpertTeams(): Promise<ExpertTeamDto[]> {
   return readJsonOrThrow(await apiFetch(`${API}/expert-teams`))
 }
 
+export async function listExpertTeamTemplates(): Promise<ExpertTeamTemplateDto[]> {
+  return readJsonOrThrow(await apiFetch(`${API}/expert-teams/templates`))
+}
+
+export async function createExpertTeam(req: CreateExpertTeamRequest): Promise<ExpertTeamDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/expert-teams`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+
+export async function createExpertTeamFromTemplate(templateId: string): Promise<ExpertTeamDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/expert-teams/from-template/${encodeURIComponent(templateId)}`, { method: 'POST' }))
+}
+
+export async function updateExpertTeam(teamId: string, req: UpdateExpertTeamRequest): Promise<ExpertTeamDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/expert-teams/${encodeURIComponent(teamId)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+
+export async function deleteExpertTeam(teamId: string): Promise<void> {
+  const r = await apiFetch(`${API}/expert-teams/${encodeURIComponent(teamId)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(await r.text())
+}
+
+export async function addExpertTeamMember(teamId: string, req: CreateExpertTeamMemberRequest): Promise<ExpertTeamMemberDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/expert-teams/${encodeURIComponent(teamId)}/members`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+
+export async function updateExpertTeamMember(teamId: string, memberId: string, req: UpdateExpertTeamMemberRequest): Promise<ExpertTeamMemberDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/expert-teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+
+export async function deleteExpertTeamMember(teamId: string, memberId: string): Promise<void> {
+  const r = await apiFetch(`${API}/expert-teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(memberId)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(await r.text())
+}
+
 export async function listExpertCategories(): Promise<ExpertCategoryDto[]> {
   return readJsonOrThrow(await fetch(`${API}/experts/categories`))
 }
@@ -122,22 +169,54 @@ export async function listExpertScenarios(): Promise<ExpertScenarioDto[]> {
   return readJsonOrThrow(await fetch(`${API}/experts/scenarios`))
 }
 
-export async function listExperts(params: { category?: string; type?: string; q?: string; sort?: string } = {}): Promise<ExpertListResultDto> {
+export async function listExperts(params: { category?: string; type?: string; q?: string; sort?: string; tag?: string; author?: string; isCustom?: boolean } = {}): Promise<ExpertListResultDto> {
   const search = new URLSearchParams()
   if (params.category) search.set('category', params.category)
   if (params.type) search.set('type', params.type)
   if (params.q) search.set('q', params.q)
   if (params.sort) search.set('sort', params.sort)
+  if (params.tag) search.set('tag', params.tag)
+  if (params.author) search.set('author', params.author)
+  if (params.isCustom !== undefined) search.set('isCustom', String(params.isCustom))
   const qs = search.toString()
-  return readJsonOrThrow(await fetch(`${API}/experts${qs ? `?${qs}` : ''}`))
+  return readJsonOrThrow(await apiFetch(`${API}/experts${qs ? `?${qs}` : ''}`))
 }
 
 export async function getExpert(id: string): Promise<ExpertDetailDto> {
-  return readJsonOrThrow(await fetch(`${API}/experts/${encodeURIComponent(id)}`))
+  return readJsonOrThrow(await apiFetch(`${API}/experts/${encodeURIComponent(id)}`))
 }
 
 export async function getExpertPrompt(id: string): Promise<ExpertPromptDto> {
-  return readJsonOrThrow(await fetch(`${API}/experts/${encodeURIComponent(id)}/prompt`))
+  return readJsonOrThrow(await apiFetch(`${API}/experts/${encodeURIComponent(id)}/prompt`))
+}
+
+export async function createCustomExpert(req: CustomExpertUpsertRequest): Promise<ExpertDetailDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/experts/custom`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+
+export async function updateCustomExpert(id: string, req: CustomExpertUpsertRequest): Promise<ExpertDetailDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/experts/custom/${encodeURIComponent(id)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+
+export async function bindCustomExpertAgent(id: string, boundAgentId?: string | null): Promise<ExpertDetailDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/experts/custom/${encodeURIComponent(id)}/agent`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ boundAgentId: boundAgentId || null }),
+  }))
+}
+
+export async function deleteCustomExpert(id: string) {
+  const r = await apiFetch(`${API}/experts/custom/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(await r.text())
+}
+
+export async function chatWithExpert(id: string, req: ExpertChatRequest): Promise<ExpertChatResponse> {
+  return readJsonOrThrow(await apiFetch(`${API}/experts/${encodeURIComponent(id)}/chat`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
 }
 
 export async function orchestrateWorkTask(taskId: string, teamId?: string | null): Promise<WorkTaskDetailDto> {
@@ -168,19 +247,105 @@ export async function cancelWorkTask(taskId: string, reason?: string): Promise<W
   }))
 }
 
+export async function* executeWorkTaskStream(taskId: string, teamId?: string | null, maxIterations = 8, timeoutSeconds = 180, signal?: AbortSignal): AsyncGenerator<ExpertTeamExecutionEventDto> {
+  const params = new URLSearchParams()
+  if (teamId) params.set('teamId', teamId)
+  params.set('maxIterations', String(maxIterations))
+  params.set('timeoutSeconds', String(timeoutSeconds))
+  const resp = await apiFetch(`${API}/work-tasks/${encodeURIComponent(taskId)}/execute-stream?${params.toString()}`, {
+    headers: { 'Accept': 'text/event-stream' },
+    signal,
+  })
+  if (!resp.ok || !resp.body) throw new Error(`stream HTTP ${resp.status}`)
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    let idx: number
+    while ((idx = buffer.indexOf('\n\n')) !== -1) {
+      const raw = buffer.slice(0, idx)
+      buffer = buffer.slice(idx + 2)
+      const event = parseExpertTeamSseEvent(raw)
+      if (event) yield event
+    }
+  }
+}
+
+function parseExpertTeamSseEvent(raw: string): ExpertTeamExecutionEventDto | null {
+  let eventName = ''
+  const dataLines: string[] = []
+  for (const line of raw.split('\n')) {
+    if (line.startsWith('event:')) eventName = line.slice(6).trim()
+    else if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart())
+  }
+  if (dataLines.length === 0) return null
+  const payload = JSON.parse(dataLines.join('\n')) as Partial<ExpertTeamExecutionEventDto> & { message?: string }
+  if (eventName === 'error') throw new Error(payload.message ?? 'Expert team stream error')
+  return {
+    type: payload.type ?? eventName,
+    taskId: String(payload.taskId ?? ''),
+    teamId: payload.teamId ?? null,
+    stepId: payload.stepId ?? null,
+    stepOrder: payload.stepOrder ?? null,
+    stepName: payload.stepName ?? null,
+    executionMode: payload.executionMode ?? null,
+    status: payload.status ?? eventName,
+    message: payload.message ?? null,
+    at: payload.at ?? new Date().toISOString(),
+  }
+}
+
 export async function listAgents(): Promise<AgentDto[]> {
   const r = await apiFetch(`${API}/agents`); return r.json()
 }
 export async function listSkills(): Promise<SkillManifestDto[]> {
   const r = await apiFetch(`${API}/skills`); return r.json()
 }
+
+export async function listSkillMarket(params: { category?: string; q?: string } = {}): Promise<SkillPackageDto[]> {
+  const search = new URLSearchParams()
+  if (params.category) search.set('category', params.category)
+  if (params.q) search.set('q', params.q)
+  const qs = search.toString()
+  return readJsonOrThrow(await apiFetch(`${API}/skills/market${qs ? `?${qs}` : ''}`))
+}
+export async function listSkillCategories(): Promise<SkillCategoryDto[]> {
+  return readJsonOrThrow(await apiFetch(`${API}/skills/categories`))
+}
+export async function listInstalledSkills(): Promise<InstalledSkillDto[]> {
+  return readJsonOrThrow(await apiFetch(`${API}/skills/installed`))
+}
+export async function installSkill(req: InstallSkillRequest): Promise<InstalledSkillDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/skills/install`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+export async function createSkill(req: CreateSkillRequest): Promise<InstalledSkillDto> {
+  return readJsonOrThrow(await apiFetch(`${API}/skills/create`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+export async function uninstallSkill(skillId: string): Promise<void> {
+  const r = await apiFetch(`${API}/skills/installed/${encodeURIComponent(skillId)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(await r.text())
+}
+export async function searchSkills(q: string, category?: string): Promise<SkillMarketEntryDto[]> {
+  const search = new URLSearchParams()
+  if (q) search.set('q', q)
+  if (category) search.set('category', category)
+  return readJsonOrThrow(await apiFetch(`${API}/skills/search?${search.toString()}`))
+}
+
 export async function listSkillTools(skillId: string): Promise<SkillToolsResponse | null> {
-  const r = await fetch(`${API}/skills/${encodeURIComponent(skillId)}/tools`)
+  const r = await apiFetch(`${API}/skills/${encodeURIComponent(skillId)}/tools`)
   if (!r.ok) return null
   return r.json()
 }
 export async function setSkillEnabled(skillId: string, enabled: boolean): Promise<boolean> {
-  const r = await fetch(`${API}/skills/${encodeURIComponent(skillId)}/enabled`, {
+  const r = await apiFetch(`${API}/skills/${encodeURIComponent(skillId)}/enabled`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ enabled }),
@@ -188,12 +353,12 @@ export async function setSkillEnabled(skillId: string, enabled: boolean): Promis
   return r.ok
 }
 export async function relevantSkills(q: string, topK = 8): Promise<SkillManifestDto[]> {
-  const r = await fetch(`${API}/skills/relevant?q=${encodeURIComponent(q)}&topK=${topK}`)
+  const r = await apiFetch(`${API}/skills/relevant?q=${encodeURIComponent(q)}&topK=${topK}`)
   if (!r.ok) return []
   return r.json()
 }
 export async function registerMcpStdio(req: McpStdioRegistrationRequest): Promise<{ ok: boolean; error?: string; skillId?: string }> {
-  const r = await fetch(`${API}/skills/register/mcp-stdio`, {
+  const r = await apiFetch(`${API}/skills/register/mcp-stdio`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -208,11 +373,34 @@ export async function registerMcpStdio(req: McpStdioRegistrationRequest): Promis
 export async function listProviders(): Promise<ProvidersResponse> {
   const r = await fetch(`${API}/providers`); return r.json()
 }
-export async function listSessions(): Promise<SessionSummaryDto[]> {
-  const r = await fetch(`${API}/sessions`); return r.json()
+export async function listSessions(q?: string): Promise<SessionSummaryDto[]> {
+  const search = new URLSearchParams()
+  if (q) search.set('q', q)
+  const qs = search.toString()
+  const r = await fetch(`${API}/sessions${qs ? `?${qs}` : ''}`); return r.json()
 }
+export async function getSession(id: string): Promise<SessionStateDto> {
+  return readJsonOrThrow(await fetch(`${API}/sessions/${encodeURIComponent(id)}`))
+}
+export async function createSession(req: SessionCreateRequest = {}): Promise<SessionStateDto> {
+  return readJsonOrThrow(await fetch(`${API}/sessions`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+export async function updateSession(id: string, req: SessionUpdateRequest): Promise<SessionStateDto> {
+  return readJsonOrThrow(await fetch(`${API}/sessions/${encodeURIComponent(id)}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+export async function prepareRegenerateSession(id: string, req: SessionRegenerateRequest): Promise<SessionStateDto> {
+  return readJsonOrThrow(await fetch(`${API}/sessions/${encodeURIComponent(id)}/regenerate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
+  }))
+}
+
 export async function deleteSession(id: string) {
-  await fetch(`${API}/sessions/${id}`, { method: 'DELETE' })
+  const r = await fetch(`${API}/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(await r.text())
 }
 
 async function readJsonOrThrow<T>(resp: Response): Promise<T> {

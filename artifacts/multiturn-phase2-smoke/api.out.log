@@ -1,0 +1,343 @@
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (35ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT COUNT(*) FROM "sqlite_master" WHERE "type" = 'table' AND "rootpage" IS NOT NULL;
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "UserAccounts" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_UserAccounts" PRIMARY KEY,
+          "Email" TEXT NOT NULL,
+          "DisplayName" TEXT NOT NULL,
+          "PasswordHash" TEXT NOT NULL,
+          "Status" TEXT NOT NULL,
+          "CreatedAt" TEXT NOT NULL,
+          "UpdatedAt" TEXT NOT NULL
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE UNIQUE INDEX IF NOT EXISTS "IX_UserAccounts_Email" ON "UserAccounts" ("Email");
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "RefreshTokens" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_RefreshTokens" PRIMARY KEY,
+          "UserId" TEXT NOT NULL,
+          "TokenHash" TEXT NOT NULL,
+          "ExpiresAt" TEXT NOT NULL,
+          "RevokedAt" TEXT NULL,
+          "CreatedAt" TEXT NOT NULL,
+          CONSTRAINT "FK_RefreshTokens_UserAccounts_UserId" FOREIGN KEY ("UserId") REFERENCES "UserAccounts" ("Id") ON DELETE CASCADE
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE UNIQUE INDEX IF NOT EXISTS "IX_RefreshTokens_TokenHash" ON "RefreshTokens" ("TokenHash");
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_RefreshTokens_UserId" ON "RefreshTokens" ("UserId");
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "CreditWallets" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_CreditWallets" PRIMARY KEY,
+          "UserId" TEXT NOT NULL,
+          "Balance" INTEGER NOT NULL,
+          "MonthlyQuota" INTEGER NOT NULL,
+          "QuotaMonth" TEXT NOT NULL,
+          "UpdatedAt" TEXT NOT NULL,
+          CONSTRAINT "FK_CreditWallets_UserAccounts_UserId" FOREIGN KEY ("UserId") REFERENCES "UserAccounts" ("Id") ON DELETE CASCADE
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE UNIQUE INDEX IF NOT EXISTS "IX_CreditWallets_UserId" ON "CreditWallets" ("UserId");
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "CreditTransactions" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_CreditTransactions" PRIMARY KEY,
+          "UserId" TEXT NOT NULL,
+          "Type" TEXT NOT NULL,
+          "Amount" INTEGER NOT NULL,
+          "BalanceAfter" INTEGER NOT NULL,
+          "SourceType" TEXT NOT NULL,
+          "SourceId" TEXT NULL,
+          "Description" TEXT NULL,
+          "CreatedAt" TEXT NOT NULL,
+          CONSTRAINT "FK_CreditTransactions_UserAccounts_UserId" FOREIGN KEY ("UserId") REFERENCES "UserAccounts" ("Id") ON DELETE CASCADE
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_CreditTransactions_UserId_CreatedAt" ON "CreditTransactions" ("UserId", "CreatedAt");
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "SubscriptionPlans" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_SubscriptionPlans" PRIMARY KEY,
+          "Name" TEXT NOT NULL,
+          "MonthlyCredits" INTEGER NOT NULL,
+          "MaxAssistants" INTEGER NOT NULL,
+          "MaxProjects" INTEGER NOT NULL,
+          "MaxAutoTasks" INTEGER NOT NULL,
+          "AllowAllModels" INTEGER NOT NULL,
+          "PriceMonthlyCents" INTEGER NOT NULL,
+          "SortOrder" INTEGER NOT NULL,
+          "Enabled" INTEGER NOT NULL
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "UserSubscriptions" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_UserSubscriptions" PRIMARY KEY,
+          "UserId" TEXT NOT NULL,
+          "PlanId" TEXT NOT NULL,
+          "Status" TEXT NOT NULL,
+          "StartedAt" TEXT NOT NULL,
+          "ExpiresAt" TEXT NULL,
+          CONSTRAINT "FK_UserSubscriptions_UserAccounts_UserId" FOREIGN KEY ("UserId") REFERENCES "UserAccounts" ("Id") ON DELETE CASCADE,
+          CONSTRAINT "FK_UserSubscriptions_SubscriptionPlans_PlanId" FOREIGN KEY ("PlanId") REFERENCES "SubscriptionPlans" ("Id") ON DELETE RESTRICT
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_UserSubscriptions_UserId_Status" ON "UserSubscriptions" ("UserId", "Status");
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "WorkTasks" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_WorkTasks" PRIMARY KEY,
+          "UserId" TEXT NOT NULL,
+          "Title" TEXT NOT NULL,
+          "Goal" TEXT NOT NULL,
+          "Status" TEXT NOT NULL,
+          "TeamId" TEXT NULL,
+          "ProviderId" TEXT NULL,
+          "Model" TEXT NULL,
+          "CreatedAt" TEXT NOT NULL,
+          "UpdatedAt" TEXT NOT NULL,
+          CONSTRAINT "FK_WorkTasks_UserAccounts_UserId" FOREIGN KEY ("UserId") REFERENCES "UserAccounts" ("Id") ON DELETE CASCADE
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_WorkTasks_UserId_UpdatedAt" ON "WorkTasks" ("UserId", "UpdatedAt");
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "WorkSteps" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_WorkSteps" PRIMARY KEY,
+          "TaskId" TEXT NOT NULL,
+          "UserId" TEXT NOT NULL,
+          "StepOrder" INTEGER NOT NULL,
+          "Name" TEXT NOT NULL,
+          "Status" TEXT NOT NULL,
+          "AgentId" TEXT NULL,
+          "Summary" TEXT NULL,
+          "ExecutionMode" TEXT NOT NULL DEFAULT 'Sequential',
+          "CreatedAt" TEXT NOT NULL,
+          "UpdatedAt" TEXT NOT NULL,
+          CONSTRAINT "FK_WorkSteps_WorkTasks_TaskId" FOREIGN KEY ("TaskId") REFERENCES "WorkTasks" ("Id") ON DELETE CASCADE,
+          CONSTRAINT "FK_WorkSteps_UserAccounts_UserId" FOREIGN KEY ("UserId") REFERENCES "UserAccounts" ("Id") ON DELETE CASCADE
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_WorkSteps_TaskId_StepOrder" ON "WorkSteps" ("TaskId", "StepOrder");
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "WorkArtifacts" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_WorkArtifacts" PRIMARY KEY,
+          "TaskId" TEXT NOT NULL,
+          "UserId" TEXT NOT NULL,
+          "Name" TEXT NOT NULL,
+          "ContentType" TEXT NOT NULL,
+          "StorageKind" TEXT NOT NULL,
+          "Content" TEXT NULL,
+          "FilePath" TEXT NULL,
+          "SizeBytes" INTEGER NOT NULL,
+          "CreatedAt" TEXT NOT NULL,
+          CONSTRAINT "FK_WorkArtifacts_WorkTasks_TaskId" FOREIGN KEY ("TaskId") REFERENCES "WorkTasks" ("Id") ON DELETE CASCADE,
+          CONSTRAINT "FK_WorkArtifacts_UserAccounts_UserId" FOREIGN KEY ("UserId") REFERENCES "UserAccounts" ("Id") ON DELETE CASCADE
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_WorkArtifacts_TaskId_CreatedAt" ON "WorkArtifacts" ("TaskId", "CreatedAt");
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "ExpertTeams" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_ExpertTeams" PRIMARY KEY,
+          "UserId" TEXT NOT NULL,
+          "Name" TEXT NOT NULL,
+          "Description" TEXT NOT NULL,
+          "Scenario" TEXT NOT NULL,
+          "Enabled" INTEGER NOT NULL,
+          "CreatedAt" TEXT NOT NULL,
+          "UpdatedAt" TEXT NOT NULL,
+          CONSTRAINT "FK_ExpertTeams_UserAccounts_UserId" FOREIGN KEY ("UserId") REFERENCES "UserAccounts" ("Id") ON DELETE CASCADE
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_ExpertTeams_UserId_Name" ON "ExpertTeams" ("UserId", "Name");
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "ExpertTeamMembers" (
+          "Id" TEXT NOT NULL CONSTRAINT "PK_ExpertTeamMembers" PRIMARY KEY,
+          "TeamId" TEXT NOT NULL,
+          "UserId" TEXT NOT NULL,
+          "MemberOrder" INTEGER NOT NULL,
+          "RoleId" TEXT NOT NULL,
+          "DisplayName" TEXT NOT NULL,
+          "AgentId" TEXT NOT NULL,
+          "Responsibility" TEXT NOT NULL,
+          "ExecutionMode" TEXT NOT NULL,
+          "Enabled" INTEGER NOT NULL,
+          CONSTRAINT "FK_ExpertTeamMembers_ExpertTeams_TeamId" FOREIGN KEY ("TeamId") REFERENCES "ExpertTeams" ("Id") ON DELETE CASCADE,
+          CONSTRAINT "FK_ExpertTeamMembers_UserAccounts_UserId" FOREIGN KEY ("UserId") REFERENCES "UserAccounts" ("Id") ON DELETE CASCADE
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE INDEX IF NOT EXISTS "IX_ExpertTeamMembers_TeamId_MemberOrder" ON "ExpertTeamMembers" ("TeamId", "MemberOrder");
+fail: Microsoft.EntityFrameworkCore.Database.Command[20102]
+      Failed executing DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      ALTER TABLE "WorkSteps" ADD COLUMN "ExecutionMode" TEXT NOT NULL DEFAULT 'Sequential';
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (3ms) [Parameters=[@package_Id='?' (Size = 21)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Name", "s"."SortOrder", "s"."UpdatedAt"
+      FROM "SkillPackages" AS "s"
+      WHERE "s"."Id" = @package_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@package_Id='?' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Name", "s"."SortOrder", "s"."UpdatedAt"
+      FROM "SkillPackages" AS "s"
+      WHERE "s"."Id" = @package_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@package_Id='?' (Size = 22)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Name", "s"."SortOrder", "s"."UpdatedAt"
+      FROM "SkillPackages" AS "s"
+      WHERE "s"."Id" = @package_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@package_Id='?' (Size = 17)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Name", "s"."SortOrder", "s"."UpdatedAt"
+      FROM "SkillPackages" AS "s"
+      WHERE "s"."Id" = @package_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@entry_Id='?' (Size = 12)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 18)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 19)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 18)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 24)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 20)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 21)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 12)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 16)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 26)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 21)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@entry_Id='?' (Size = 18)], CommandType='Text', CommandTimeout='30']
+      SELECT "s"."Id", "s"."Category", "s"."CreatedAt", "s"."Description", "s"."Enabled", "s"."Name", "s"."PackageId", "s"."SkillMarkdown", "s"."SortOrder", "s"."Source", "s"."SourceUrl", "s"."TagsJson", "s"."TriggerPhrasesJson", "s"."UpdatedAt"
+      FROM "SkillMarketEntries" AS "s"
+      WHERE "s"."Id" = @entry_Id
+      LIMIT 1
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "i"."SkillId", "i"."Category", "i"."Description", "i"."Enabled", "i"."InstallPath", "i"."InstalledAt", "i"."MarketEntryId", "i"."Name", "i"."Scope", "i"."TagsJson", "i"."TriggerPhrasesJson", "i"."UpdatedAt"
+      FROM "InstalledSkills" AS "i"
+      WHERE trim("i"."InstallPath") <> ''
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "i"."SkillId", "i"."Category", "i"."Description", "i"."Enabled", "i"."InstallPath", "i"."InstalledAt", "i"."MarketEntryId", "i"."Name", "i"."Scope", "i"."TagsJson", "i"."TriggerPhrasesJson", "i"."UpdatedAt"
+      FROM "InstalledSkills" AS "i"
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://0.0.0.0:5050
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: D:\work-1\QianYuan.AIAgenticFramework\src\QianYuan.Api
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@p='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."Title", "c"."AgentId", "c"."CreatedAt", "c"."UpdatedAt", (
+          SELECT COUNT(*)
+          FROM "ConversationMessages" AS "c0"
+          WHERE "c"."Id" = "c0"."ConversationId" AND NOT ("c0"."IsDeleted")) AS "MessageCount"
+      FROM "Conversations" AS "c"
+      WHERE "c"."Status" <> 'Deleted'
+      ORDER BY "c"."UpdatedAt" DESC
+      LIMIT @p
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@p='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."Title", "c"."AgentId", "c"."CreatedAt", "c"."UpdatedAt", (
+          SELECT COUNT(*)
+          FROM "ConversationMessages" AS "c0"
+          WHERE "c"."Id" = "c0"."ConversationId" AND NOT ("c0"."IsDeleted")) AS "MessageCount"
+      FROM "Conversations" AS "c"
+      WHERE "c"."Status" <> 'Deleted'
+      ORDER BY "c"."UpdatedAt" DESC
+      LIMIT @p
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@sessionId='?' (Size = 32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c1"."Id", "c1"."AgentId", "c1"."CreatedAt", "c1"."MetadataJson", "c1"."Status", "c1"."Summary", "c1"."Title", "c1"."UpdatedAt", "c1"."UserId", "c0"."Id", "c0"."ContentJson", "c0"."ConversationId", "c0"."CreatedAt", "c0"."IsDeleted", "c0"."Role", "c0"."SortOrder", "c0"."Tokens"
+      FROM (
+          SELECT "c"."Id", "c"."AgentId", "c"."CreatedAt", "c"."MetadataJson", "c"."Status", "c"."Summary", "c"."Title", "c"."UpdatedAt", "c"."UserId"
+          FROM "Conversations" AS "c"
+          WHERE "c"."Id" = @sessionId AND "c"."Status" <> 'Deleted'
+          LIMIT 1
+      ) AS "c1"
+      LEFT JOIN "ConversationMessages" AS "c0" ON "c1"."Id" = "c0"."ConversationId"
+      ORDER BY "c1"."Id"
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (0ms) [Parameters=[@p='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT "c"."Id", "c"."Title", "c"."AgentId", "c"."CreatedAt", "c"."UpdatedAt", (
+          SELECT COUNT(*)
+          FROM "ConversationMessages" AS "c0"
+          WHERE "c"."Id" = "c0"."ConversationId" AND NOT ("c0"."IsDeleted")) AS "MessageCount"
+      FROM "Conversations" AS "c"
+      WHERE "c"."Status" <> 'Deleted'
+      ORDER BY "c"."UpdatedAt" DESC
+      LIMIT @p

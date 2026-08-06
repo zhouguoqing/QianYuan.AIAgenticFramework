@@ -1,0 +1,130 @@
+[
+  {
+    "page": "仪表盘首页",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate '系统管理员' to English",
+    "screenshot": "dashboard_base.png"
+  },
+  {
+    "page": "仪表盘首页",
+    "element": "page.title",
+    "text": "Initialize-Operator Service Platform-运营商服务平台",
+    "type": "页面标题含中文",
+    "suggestion": "Translate page title to English",
+    "screenshot": "dashboard_base.png"
+  },
+  {
+    "page": "Home",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Home.png"
+  },
+  {
+    "page": "Workbench",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Workbench.png"
+  },
+  {
+    "page": "Initialize",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Initialize.png"
+  },
+  {
+    "page": "Business Compass",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Business_Compass.png"
+  },
+  {
+    "page": "Revenue Analysis",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Revenue_Analysis.png"
+  },
+  {
+    "page": "Risk Control",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Risk_Control.png"
+  },
+  {
+    "page": "Charging Station",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Charging_Station.png"
+  },
+  {
+    "page": "Pricing Mgmt",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Pricing_Mgmt.png"
+  },
+  {
+    "page": "Schedule",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Schedule.png"
+  },
+  {
+    "page": "Station List",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Station_List.png"
+  },
+  {
+    "page": "Idle Fee Mgmt",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Idle_Fee_Mgmt.png"
+  },
+  {
+    "page": "Station View",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Station_View.png"
+  },
+  {
+    "page": "Digital View",
+    "element": "span",
+    "text": "系统管理员",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": "detail_Digital_View.png"
+  },
+  {
+    "page": "/web/render?fid=a2618b4f-1c7c-431e-9d27-",
+    "element": "span",
+    "text": "简体中文",
+    "type": "硬编码中文",
+    "suggestion": "Translate to English",
+    "screenshot": ""
+  }
+]

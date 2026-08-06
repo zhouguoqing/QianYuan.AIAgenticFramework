@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { renderMarkdown, renderUmlDiagrams } from '../services/markdown'
 
 export type DisplayKind = 'user' | 'assistant' | 'tool' | 'thinking' | 'error' | 'warning' | 'observation'
@@ -10,6 +10,7 @@ export interface DisplayMessage {
   streaming?: boolean
   imageUrls?: string[]
   toolName?: string
+  sourceIndex?: number
   createdAt?: string
   model?: string | null
   provider?: string | null
@@ -20,14 +21,19 @@ export interface DisplayMessage {
   usage?: { input: number; output: number; cacheRead?: number; cacheWrite?: number } | null
 }
 
-export function ChatMessageView({ msg }: { msg: DisplayMessage }) {
+interface ChatMessageViewProps {
+  msg: DisplayMessage
+  onRegenerateUserMessage?: (msg: DisplayMessage, nextText?: string) => void
+}
+
+export function ChatMessageView({ msg, onRegenerateUserMessage }: ChatMessageViewProps) {
   useEffect(() => { renderUmlDiagrams() }, [msg.text, msg.streaming])
   const [copied, setCopied] = useState(false)
 
   const label =
     msg.kind === 'user' ? '你'
     : msg.kind === 'assistant' ? '乾元'
-    : msg.kind === 'thinking' ? '思考中…'
+    : msg.kind === 'thinking' ? '思考中'
     : msg.kind === 'tool' ? `工具调用 · ${msg.toolName ?? ''}`
     : msg.kind === 'observation' ? `工具结果 · ${msg.toolName ?? ''}`
     : msg.kind === 'warning' ? '警告'
@@ -35,6 +41,7 @@ export function ChatMessageView({ msg }: { msg: DisplayMessage }) {
 
   const role = roleFor(msg.kind)
   const meta = useMemo(() => messageMeta(msg), [msg])
+  const canRegenerate = msg.kind === 'user' && !msg.streaming && msg.sourceIndex !== undefined && Boolean(onRegenerateUserMessage)
 
   const cls = msg.kind === 'observation' ? 'observation' : msg.kind
   const isPlain = msg.kind === 'tool' || msg.kind === 'observation'
@@ -49,6 +56,11 @@ export function ChatMessageView({ msg }: { msg: DisplayMessage }) {
     window.setTimeout(() => setCopied(false), 1200)
   }
 
+  function editAndRegenerate() {
+    const next = window.prompt('编辑这条消息后重新生成', msg.text || '')
+    if (next !== null) onRegenerateUserMessage?.(msg, next)
+  }
+
   return (
     <div className={`msg rich-msg ${cls} ${msg.streaming ? 'streaming' : ''}`}>
       <div className="message-avatar" aria-hidden="true">{role.initial}</div>
@@ -61,6 +73,8 @@ export function ChatMessageView({ msg }: { msg: DisplayMessage }) {
           <div className="message-actions">
             {meta.map(item => <span key={item} className="message-meta-chip">{item}</span>)}
             {msg.streaming && <span className="live-chip">生成中</span>}
+            {canRegenerate && <button type="button" className="message-copy" onClick={() => onRegenerateUserMessage?.(msg)}>重新生成</button>}
+            {canRegenerate && <button type="button" className="message-copy" onClick={editAndRegenerate}>编辑重发</button>}
             {msg.text && <button type="button" className="message-copy" onClick={copyText}>{copied ? '已复制' : '复制'}</button>}
           </div>
         </div>
@@ -91,13 +105,13 @@ function PlainBlock({ text, label }: { text: string; label: string }) {
 
 function roleFor(kind: DisplayKind) {
   switch (kind) {
-    case 'user': return { initial: '你', subtitle: '用户输入' }
-    case 'assistant': return { initial: '✦', subtitle: '云端模型回复' }
-    case 'thinking': return { initial: '◌', subtitle: '推理过程' }
-    case 'tool': return { initial: '⌘', subtitle: '技能与工具' }
-    case 'observation': return { initial: '⟡', subtitle: '工具观察结果' }
-    case 'warning': return { initial: '⚠', subtitle: '可恢复提示' }
-    case 'error': return { initial: '⨯', subtitle: '执行错误' }
+    case 'user': return { initial: '我', subtitle: '用户消息' }
+    case 'assistant': return { initial: '乾', subtitle: 'AI 回复' }
+    case 'thinking': return { initial: '思', subtitle: '推理过程' }
+    case 'tool': return { initial: '调', subtitle: '工具调用' }
+    case 'observation': return { initial: '结', subtitle: '工具返回' }
+    case 'warning': return { initial: '!', subtitle: '运行警告' }
+    case 'error': return { initial: '错', subtitle: '运行错误' }
   }
 }
 
@@ -127,4 +141,3 @@ function tryPrettyJson(s: string): string {
   }
   return s
 }
-

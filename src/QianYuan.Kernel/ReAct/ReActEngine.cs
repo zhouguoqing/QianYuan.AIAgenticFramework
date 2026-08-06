@@ -26,6 +26,7 @@ public sealed class ReActEngine
     private readonly ISkillManager _skills;
     private readonly IAgentRegistry _agents;
     private readonly ILogger<ReActEngine> _logger;
+    private readonly ITokenCounter _tokenCounter;
     private readonly ReActEngineOptions _opts;
 
     public ReActEngine(
@@ -33,12 +34,14 @@ public sealed class ReActEngine
         ISkillManager skills,
         IAgentRegistry agents,
         ILogger<ReActEngine> logger,
-        ReActEngineOptions? opts = null)
+        ReActEngineOptions? opts = null,
+        ITokenCounter? tokenCounter = null)
     {
         _llm = llm;
         _skills = skills;
         _agents = agents;
         _logger = logger;
+        _tokenCounter = tokenCounter ?? new HeuristicTokenCounter();
         _opts = opts ?? new ReActEngineOptions();
     }
 
@@ -69,7 +72,7 @@ public sealed class ReActEngine
         var maxIter = request.MaxIterations ?? _opts.MaxIterations;
         TokenUsage? lastUsage = null;
         string? finishReason = null;
-        var loop = request.LoopEngineering ?? new LoopEngineeringRuntime(_opts.LoopEngineering);
+        var loop = request.LoopEngineering ?? new LoopEngineeringRuntime(_opts.LoopEngineering, _tokenCounter, _opts.Model ?? _llm.DefaultModel);
 
         while (true)
         {
@@ -166,6 +169,7 @@ public sealed class ReActEngine
                         if (chunk.ToolCallId is not null && pendingCalls.TryGetValue(chunk.ToolCallId, out var cur))
                         {
                             cur.Args.Append(chunk.ToolArgsJson ?? "");
+                            yield return chunk with { AgentId = request.SelfAgentId, Step = iteration };
                         }
                         break;
 
@@ -178,6 +182,13 @@ public sealed class ReActEngine
                                 done.Args.Clear();
                                 done.Args.Append(chunk.ToolArgsJson);
                             }
+                            yield return chunk with
+                            {
+                                AgentId = request.SelfAgentId,
+                                Step = iteration,
+                                ToolName = string.IsNullOrWhiteSpace(chunk.ToolName) ? done.Name : chunk.ToolName,
+                                ToolArgsJson = done.Args.ToString().Trim().Length == 0 ? "{}" : done.Args.ToString(),
+                            };
                         }
                         break;
 

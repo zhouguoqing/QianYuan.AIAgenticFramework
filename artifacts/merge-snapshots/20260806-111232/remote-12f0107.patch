@@ -1,0 +1,906 @@
+﻿commit 12f01075c6e591cf2a8a0f2631ddebebeccd107d
+Author:     周国庆 <zhougq@teld.cn>
+AuthorDate: Sun Aug 2 23:41:38 2026 +0800
+Commit:     周国庆 <zhougq@teld.cn>
+CommitDate: Sun Aug 2 23:41:38 2026 +0800
+
+    support Text2Image
+
+diff --git a/.workbuddy/memory/2026-07-27.md b/.workbuddy/memory/2026-07-27.md
+new file mode 100644
+index 0000000..7c4ad2d
+--- /dev/null
++++ b/.workbuddy/memory/2026-07-27.md
+@@ -0,0 +1,45 @@
++# 2026-07-27 工作日志
++
++## 创建运营商产品审查 Agent
++
++### 完成内容
++1. **创建 Skill**: `skills/carrier-product-review/SKILL.md`
++   - ID: `skill.carrier.product.review`
++   - 覆盖六大审查维度：业务流程合理性、功能领先性、客户与老板视角、UI交互主流设计、反人类设计与易用性、产品改进建议
++   - 每个维度包含详细审查框架、输出要求
++   - 标准输出模板 + 最少必要材料清单 + 语言风格指南
++
++2. **注册 Agent**: 通过 Agent Store API (POST /api/agent-store) 创建
++   - Agent ID: `carrier-product-reviewer`
++   - Name: 运营商产品审查专家
++   - Provider: openai, Model: 空（使用 Provider 默认 GPT-5.5）
++   - System Prompt: 定义角色、六大维度职责、工作方式、输出规范
++
++3. **挂载 Skill**: POST /api/agent-store/carrier-product-reviewer/skills
++   - Skill: `skill.carrier.product.review`, priority=100
++
++### 注意事项
++- 上游 LLM 网关 (http://20.246.64.40/v1) token 当前无模型访问权限（403），影响所有 Agent 的交互测试
++- Agent 本身配置正确，待 token 权限恢复后即可正常使用
++- Skill ID 的连字符在加载时被转为点号：frontmatter `skill.carrier-product-review` → 运行时 `skill.carrier.product.review`
++
++## 运营商产品审查 Agent 首次实战应用
++
++### 审查对象
++- **产品**: 充电服务管理平台（Teld 云平台）
++- **URL**: https://cloud.cf01.teld.cn/web/render?fid=4607c65f-bd57-4d3a-8f1c-2f35af7418a7
++- **限制**: SPA 需登录，主内容区 SSR 为空，审查基于平台框架层可观测部分
++
++### 审查方法
++- HTML 源码静态分析（118KB Nuxt.js SSR 输出）
++- WebFetch 内容提取
++- Chrome Headless 截图（白屏，确认需登录后 JS 加载）
++
++### 关键发现（14项问题）
++- **P0 阻断级**: 运维工时 "0" 暴露给客户、帮助中心建设中（空白）、反馈字数限制 255 过严、新功能强阻断弹窗、缺少管理层 Dashboard
++- **P1 严重级**: 反馈无处理进度闭环、搜索空状态无引导、服务等级字段为空、AI 助手无场景引导
++- **P2/P3 优化级**: SSR height:NaNpx、z-index 层级混乱、移动端适配缺失、AI iframe 浅层集成、"返回旧版" 入口过于显眼
++
++### 产出
++- 审查报告: `artifacts/carrier-product-review-report.md`
++- 问题分布图: SVG 可视化
+diff --git a/artifacts/carrier-product-review-report.md b/artifacts/carrier-product-review-report.md
+new file mode 100644
+index 0000000..09d3873
+--- /dev/null
++++ b/artifacts/carrier-product-review-report.md
+@@ -0,0 +1,305 @@
++# 充电服务管理平台 — 产品审查报告
++
++> 审查时间：2026-07-27  
++> 审查对象：充电服务管理平台（https://cloud.cf01.teld.cn/web/render）  
++> 审查依据：页面 HTML 源码静态分析 + WebFetch 内容提取  
++> ⚠️ 限制说明：目标页面为 SPA，需登录后通过 API 加载 `fid` 对应内容。以下审查基于平台框架层（Layout Shell）的可观测部分。
++
++---
++
++## 一、审查概览
++
++| 维度 | 严重等级 | 问题数 | 总体评价 |
++|------|---------|--------|---------|
++| 业务流程合理性 | P2 | 3 | 中等，存在流程断裂风险 |
++| 功能领先性 | P3 | 2 | 一般，AI 集成有亮点但浅层 |
++| 客户与老板视角 | P1 | 2 | 较差，运维信息暴露、服务等级缺失 |
++| UI 交互主流设计 | P2 | 4 | 中等，组件规范但布局有瑕疵 |
++| 反人类设计与易用性 | P1 | 3 | 较差，多处阻断性设计 |
++| 产品改进建议 | — | 5 | 详见各维度建议 |
++
++---
++
++## 二、业务流程合理性审查
++
++### 问题 1：搜索功能流程断裂（P2）
++
++**现象**：页面多处搜索组件显示 "功能（0）" / "数据（0）"，搜索结果为空时不提供引导操作。
++
++**原因**：SSR 渲染时未携带搜索索引数据，需等待 JS 执行和 API 调用后才能填充；空状态缺乏 "去首页浏览"、"查看全部应用" 等引导链接。
++
++**影响**：用户首次进入时面对空搜索结果，产生 "平台无功能" 的错觉，增加认知负担。
++
++**建议**：
++- SSR 时预渲染热门应用/功能列表
++- 空状态增加引导："浏览全部应用"、"查看最近使用"、"联系管理员开通权限"
++- 搜索框增加搜索历史/快捷入口
++
++### 问题 2：反馈流程存在信息孤岛（P2）
++
++**现象**：反馈表单中的 "可用运维工时: 0工时"、"服务等级:" 字段显示异常值（0 和空）。
++
++**原因**：用户未关联服务合同或服务等级未配置时，系统直接展示原始数值，未做兜底处理。
++
++**影响**：
++- 用户对 "0工时" 产生困惑——是我没有运维支持？还是系统 bug？
++- "服务等级" 为空，用户无法判断自己的支持级别
++
++**建议**：
++- 增加兜底文案："联系管理员配置运维服务" 或 "您的服务等级：标准版"
++- 隐藏无意义字段，改为悬停提示
++- 在反馈流程中增加 SLA 预估（如 "预计 2 小时内响应"）
++
++### 问题 3：AI 助手入口无引导流程（P2）
++
++**现象**：ChatGPT 入口存在（GPT3.5/GPT4.0 切换），但输入框占位符仅为 "请输入内容（回车可直接发送消息）"，无场景引导。
++
++**原因**：AI 功能缺少 Onboarding 设计，用户不知道可以问什么、能做什么。
++
++**影响**：AI 功能使用率低下，沦为摆设。
++
++**建议**：
++- 增加快捷提问模板："如何查看充电订单？"、"帮我生成日报"、"解释这个功能的作用"
++- 首次使用时展示欢迎语和功能介绍
++- 根据用户角色预置不同 prompt 模板（运营/运维/管理）
++
++---
++
++## 三、功能领先性审查
++
++### 问题 4：AI 集成停留在表层（P3）
++
++**现象**：AI 功能仅为通用 ChatGPT 对话窗口，iframe 嵌入，无业务深度集成。
++
++**原因**：AI 功能为快速集成方案，未与充电业务数据打通。
++
++**影响**：
++- 无法回答业务相关问题（如 "昨天某站点的充电量"）
++- 无法执行操作（如 "帮我导出报表"）
++- 与平台其他功能无联动
++
++**建议**：
++- **短期**：增加 RAG 知识库，接入平台帮助文档和功能说明
++- **中期**：打通业务数据 API，支持数据查询和报表生成
++- **长期**：构建 Agent 能力，支持 "帮我在 XX 站点创建充电策略" 等操作型指令
++
++### 问题 5：反馈系统缺乏闭环（P3）
++
++**现象**：反馈提交后仅展示 "我的反馈" 列表，无处理进度追踪、无满意度评价。
++
++**原因**：反馈系统可能只完成了 "收集" 环节，未打通工单系统。
++
++**影响**：用户不知道反馈是否被处理、何时处理，降低再次反馈意愿。
++
++**建议**：
++- 对接工单系统，反馈 = 自动创建工单
++- 增加状态流转：已提交 → 已受理 → 处理中 → 待确认 → 已解决
++- 增加满意度评价（NPS 评分 + 文字评价）
++- 处理完成后通知用户（站内信/邮件/企微）
++
++---
++
++## 四、客户与老板视角审查
++
++### 问题 6：运维信息暴露引起客户焦虑（P1）
++
++**现象**：反馈页面直接展示 "可用运维工时: 0工时"。
++
++**原因**：未区分 "内部运维人员" 和 "客户" 视角，把内部资源信息暴露给普通用户。
++
++**影响**：
++- **客户视角**："我的服务已经用完了？" "是不是没人管我了？"
++- **老板视角**：资源管理信息外泄，客户可能据此压价或投诉
++
++**建议**：
++- **立即修复**：对普通用户隐藏运维工时字段
++- 仅对内部人员或已签约 SLA 客户展示
++- 替换为客户友好的文案："您的工单将优先处理" / "预计响应时间：2小时"
++
++### 问题 7：缺少管理层 Dashboard 入口（P1）
++
++**现象**：从平台框架层看，没有明显的 "数据看板"、"经营分析"、"运营报表" 入口。
++
++**原因**：平台定位为操作层工具，缺少决策支持层设计。
++
++**影响**：
++- 老板视角：无法快速了解充电业务整体运行状况
++- 管理层：需要逐个点开功能查看，效率低下
++
++**建议**：
++- 在顶部或首页增加 "运营概览" Dashboard
++- 关键指标卡片：今日充电量、活跃站点数、故障率、收入趋势
++- 支持一键下钻到详细报表
++
++---
++
++## 五、UI 交互主流设计审查
++
++### 问题 8：布局高度计算异常（P2）
++
++**现象**：多处 `style="height:NaNpx"` 出现在源码中。
++
++```html
++<div class="dashboard-main" style="height:NaNpx;display:flex;" data-v-3f2b2751>
++<iframe ... style="height:NaNpx;" data-v-03944bea data-v-c045668a>
++```
++
++**原因**：高度计算依赖 JS 运行时值（如 `window.innerHeight`），SSR 阶段无 `window` 对象导致 `NaN`。
++
++**影响**：
++- SSR 阶段布局闪烁（FOUC）
++- 可能导致 iframe 内容区域高度为 0
++- 影响首屏体验
++
++**建议**：
++- SSR 时增加兜底高度（如 `100vh` 或 `calc(100vh - 60px)`）
++- 使用 CSS 变量（`var(--layout-height, 100vh)`）
++- 在 `mounted` 生命周期中重新计算并更新
++
++### 问题 9：对话框层级管理混乱（P2）
++
++**现象**：
++- 反馈抽屉：`zIndex="30020"`
++- 通知弹窗：`zIndex="40000"`
++- 其他渲染对话框：`zIndex="10001"`（被注释说明 `otherRenderDialog .el-dialog__wrapper{z-index:10001!important}`）
++
++**原因**：z-index 为硬编码分散值，缺少统一管理层级系统。
++
++**影响**：
++- 可能出现弹窗被其他弹窗覆盖的情况
++- 维护困难，新增弹窗时容易冲突
++
++**建议**：
++- 建立统一的 z-index 层级规范：
++  - 基础内容：0-1000
++  - 固定头部/侧边栏：1000-2000
++  - 模态框/对话框：2000-3000
++  - 通知/Toast：3000-4000
++  - 全屏遮罩/Loading：4000+
++- 使用 CSS 变量管理：`--z-index-modal: 2000`
++
++### 问题 10：移动端适配缺失（P2）
++
++**现象**：
++- `viewport` 设置为 `maximum-scale=1, user-scalable=no`
++- 页面框架为桌面端布局（左侧边栏 0-380px，固定头部）
++
++**原因**：产品设计定位为桌面端，未考虑移动场景。
++
++**影响**：
++- 运维人员可能需要现场用手机查看充电站状态
++- 管理层可能在移动场景下查看数据
++
++**建议**：
++- 至少保证移动端可访问（响应式布局或独立 H5）
++- 关键功能（告警查看、数据概览）支持移动端
++- 取消 `user-scalable=no`，保证无障碍需求
++
++### 问题 11："返回旧版" 按钮的位置与语义（P2）
++
++**现象**："返回旧版" 按钮位于头部右侧工具区，样式与功能按钮一致。
++
++**原因**：新旧版本切换是临时过渡需求，但入口过于显眼。
++
++**影响**：
++- 新用户可能误点进入旧版，产生困惑
++- 长期存在会削弱新版权威感
++
++**建议**：
++- 降级为次要入口：放入用户菜单或设置中
++- 增加使用引导："新版已全面升级，旧版将于 X 月下线"
++- 收集返回旧版的原因数据，针对性优化新版
++
++---
++
++## 六、反人类设计与易用性审查
++
++### 问题 12：帮助中心建设中（P1）
++
++**现象**：帮助中心显示 "帮助系统建设中"，且为空白页面。
++
++**原因**：帮助文档未准备好就上线了入口。
++
++**影响**：
++- 用户遇到问题时无处可查
++- 客服压力增大
++- 平台专业度受损
++
++**建议**：
++- **立即**：至少提供基础 FAQ 和常用功能操作指南
++- 接入 AI 知识库（已有 ChatGPT，可先用 RAG 方案）
++- 每个功能页面增加 "?" 帮助图标，链接到对应文档
++
++### 问题 13：新功能提醒的阻断设计（P1）
++
++**现象**："新功能提醒" 使用全屏遮罩/弹窗形式，需用户主动点击 "我知道了" 或 "立即体验" 才能关闭。
++
++**原因**：采用强提示方式确保用户看到新功能。
++
++**影响**：
++- 每次登录都弹窗，打断工作流
++- "立即体验" 按钮导向的 "自动启动功能列表" 概念不清晰
++- 没有 "不再提醒" 选项
++
++**建议**：
++- 改为非阻断式提示（如顶部横幅、Badge 红点）
++- 增加 "今日不再提醒" / "已了解" 选项
++- 功能说明需更直观：用 GIF 或截图展示 "自动启动" 的效果
++
++### 问题 14：反馈描述字数限制过严（P1）
++
++**现象**：问题描述 textarea 限制 `maxlength="255"`。
++
++**原因**：限制字段长度以控制数据库存储。
++
++**影响**：
++- 复杂问题无法描述清楚（如包含报错堆栈、复现步骤、截图说明）
++- 用户被迫删减关键信息
++
++**建议**：
++- 放宽至 2000 字或不限字数
++- 增加富文本编辑（支持加粗、列表、代码块）
++- 已支持附件上传，建议在描述区提示 "详细描述 + 截图附件"
++
++---
++
++## 七、产品改进建议（优先级矩阵）
++
++| 优先级 | 建议项 | 预计工作量 | 预期收益 |
++|--------|--------|-----------|---------|
++| **P0** | 隐藏/修复 "可用运维工时: 0" 暴露问题 | 0.5d | 避免客户焦虑，防止 SLA 信息外泄 |
++| **P0** | 帮助中心至少提供基础 FAQ | 2d | 降低客服压力，提升自助解决率 |
++| **P1** | 增加管理层 Dashboard 入口 | 5d | 满足老板视角需求，提升决策效率 |
++| **P1** | 反馈系统增加处理进度闭环 | 3d | 提升用户满意度，建立信任 |
++| **P1** | 放宽反馈描述字数限制 | 0.5d | 提升反馈质量，减少来回沟通 |
++| **P2** | 修复 SSR height:NaNpx 问题 | 1d | 消除布局闪烁，提升首屏体验 |
++| **P2** | AI 助手增加业务知识库（RAG） | 5d | 提升 AI 实用性，减少人工咨询 |
++| **P2** | 搜索空状态增加引导 | 1d | 降低用户流失，提升功能发现率 |
++| **P3** | 移动端响应式适配 | 10d | 扩展使用场景，覆盖现场运维 |
++| **P3** | 统一 z-index 层级管理 | 1d | 降低维护成本，避免弹窗冲突 |
++
++---
++
++## 八、总体评价
++
++### 优势
++1. **平台架构规范**：基于 Nuxt.js SSR + Element UI，组件化程度较高
++2. **国际化支持**：内置 zh-CN/en-US/pt-BR/zh-HK 多语言框架
++3. **AI 前瞻布局**：已接入 ChatGPT（GPT3.5/4.0），具备扩展潜力
++4. **反馈系统完整**：分类明确、支持附件、有反馈中心
++
++### 劣势
++1. **内容层缺失**：帮助中心建设中、搜索无引导、空状态体验差
++2. **视角单一**：侧重操作层，缺少管理层/老板视角的决策支持
++3. **信息暴露风险**：运维资源信息直接展示给客户
++4. **AI 浅层集成**：仅 iframe 嵌入，未与业务打通
++
++### 建议路线
++- **短期（1-2 周）**：修复信息暴露、补齐帮助中心、优化反馈体验
++- **中期（1-2 月）**：AI 业务知识库、管理层 Dashboard、反馈闭环
++- **长期（3-6 月）**：移动端适配、AI Agent 能力、数据驱动运营
++
++---
++
++*报告生成时间：2026-07-27 23:30*  
++*审查 Agent：运营商产品审查专家 (carrier-product-reviewer)*
+diff --git a/skills/carrier-product-review/SKILL.md b/skills/carrier-product-review/SKILL.md
+new file mode 100644
+index 0000000..bc03a40
+--- /dev/null
++++ b/skills/carrier-product-review/SKILL.md
+@@ -0,0 +1,289 @@
++---
++id: skill.carrier-product-review
++name: carrier-product-review
++description: 运营商产品审查，覆盖业务流程合理性、功能领先性、客户与老板视角、UI交互主流设计、反人类设计与易用性、改进建议六大维度。
++tags: [carrier, telecom, product, review, audit, ui, ux, usability, business-process, innovation, 运营商, 产品审查, 产品评审, 交互设计, 易用性, 业务流程, 领先性]
++---
++
++# 运营商产品审查 Skill
++
++当用户询问运营商产品审查、产品评审、产品体验评估、功能审查、交互设计审查、易用性评估、产品改进建议等问题时，使用本技能进行结构化产品审查。
++
++## 角色定位
++
++你是一名运营商产品审查专家，具备通信运营商行业背景，深谙电信/联通/移动等运营商产品体系（如套餐管理、账务查询、营业受理、渠道协同、政企客户管理、数字内容、增值业务等），擅长从业务流程、功能领先性、客户与管理者视角、交互设计、易用性等多维度做系统性审查，并输出可落地的改进建议。
++
++## 总体审查原则
++
++- 先明确审查对象：是单个功能模块、完整产品线、某个业务流程，还是整个 App/平台。
++- 先定位核心场景再审查细节：明确产品面向的用户群体（C 端个人用户、B 端政企客户、营业员/内部员工）和核心业务场景。
++- 先框架后细节：按六大维度逐一审查，每个维度先给结论再展开证据。
++- 区分"设计缺陷"与"体验瑕疵"：设计缺陷影响业务完成率，优先级高；体验瑕疵影响满意度，优先级次之。
++- 每个问题必须给出：问题描述、影响范围、严重等级、改进建议。
++- 审查结论要可执行：避免"建议优化""建议提升"等空泛建议，要给出具体的设计方向或交互方案。
++- 如缺少产品材料，应先列出审查所需的最少必要材料清单，再基于经验给初步审查意见。
++
++## 一、业务流程合理性审查
++
++适用于审查产品功能是否存在业务流程断裂、逻辑漏洞、流程冗余、场景缺失等问题。
++
++### 审查框架
++
++1. **流程完整性**
++   - 核心业务流程是否闭环：从入口 → 操作 → 确认 → 结果 → 后续状态，是否有断点。
++   - 异常流程是否覆盖：网络异常、超时、并发操作、权限不足、数据冲突等场景是否有兜底处理。
++   - 关键节点是否缺失：如订单提交后无确认页、支付后无回执、变更后无通知。
++   - 重点看：主流程节点数、异常分支覆盖率、状态机完整性、回退路径。
++
++2. **流程逻辑性**
++   - 前后步骤是否有因果关系：是否存在"先填 A 才能填 B"但界面上 B 在 A 前面的问题。
++   - 条件分支是否合理：不同用户类型、不同业务场景的分支逻辑是否正确。
++   - 状态流转是否合理：如"已取消"的订单是否还能"已支付"，"已生效"的套餐是否还能修改。
++   - 重点看：条件分支逻辑、状态流转规则、前置校验时机、数据依赖关系。
++
++3. **流程效率**
++   - 操作步骤是否最短：能用 2 步完成的流程不应拆成 5 步。
++   - 是否存在冗余确认：连续多次弹窗确认、重复填写信息、重复身份验证。
++   - 是否支持批量操作：营业场景下的批量开户、批量变更、批量缴费是否支持。
++   - 重点看：核心流程操作步数、平均完成时间、重复操作次数、人工干预点。
++
++4. **场景覆盖性**
++   - 是否覆盖所有用户类型：新用户、老用户、特殊套餐用户、政企用户、异网用户。
++   - 是否覆盖所有业务场景：正常场景 + 边界场景 + 极端场景。
++   - 多渠道协同是否一致：App、小程序、H5、营业厅、客服热线之间的数据与状态是否一致。
++   - 重点看：场景覆盖率、渠道一致性、用户类型适配度。
++
++### 输出要求
++
++- 列出所有发现的流程问题，按"断点 > 逻辑错误 > 冗余 > 场景缺失"排序。
++- 每个问题标注影响范围（全量用户/特定用户/特定场景）和严重等级（P0/P1/P2）。
++- 给出流程修复方案，包含目标流程图描述。
++
++## 二、功能领先性审查
++
++适用于审查产品功能在行业中的领先程度、创新性、差异化竞争力。
++
++### 审查框架
++
++1. **行业对标**
++   - 对标三大运营商同类产品：移动、电信、联通的对应功能做了什么，本产品是否有差距。
++   - 对标互联网标杆产品：用户日常使用的微信、支付宝、美团等产品的交互体验。
++   - 对标行业趋势：5G 消息、AI 客服、数字人、云网融合、算力网络等新方向。
++   - 重点看：功能对标清单、差距矩阵、领先/持平/落后标注。
++
++2. **创新维度**
++   - 技术创新：是否使用了新技术（AI、大数据、RPA、区块链）提升体验或效率。
++   - 模式创新：是否有新的业务模式、服务模式、计费模式。
++   - 体验创新：是否有差异化的交互方式、个性化推荐、智能引导。
++   - 重点看：创新功能数量、创新落地效果、用户感知度。
++
++3. **功能前瞻性**
++   - 是否预留扩展能力：架构设计是否支持未来业务扩展、多租户、多场景。
++   - 是否跟进行业标准：3GPP、GSMA、CCSA 等标准的新方向是否在产品中有体现。
++   - 是否有技术债务：遗留技术是否阻碍功能演进。
++   - 重点看：架构扩展性、标准跟进度、技术债务清单。
++
++4. **差异化竞争力**
++   - 本产品相比竞品的独特卖点是什么。
++   - 独特卖点是否可被用户感知、是否形成使用粘性。
++   - 差异化功能是否有壁垒（数据壁垒、网络壁垒、生态壁垒）。
++   - 重点看：USP（独特卖点）清单、用户感知度、竞争壁垒分析。
++
++### 输出要求
++
++- 生成"功能领先性对标矩阵"，标注每个核心功能的对标状态。
++- 列出创新功能清单，按"已落地/规划中/缺失"分类。
++- 给出领先性提升建议，包含短中长期路径。
++
++## 三、客户与老板视角审查
++
++适用于审查产品功能是否真正站在最终用户和决策者角度设计。
++
++### 审查框架
++
++1. **客户视角（C 端用户）**
++   - 用户是否看得懂：专业术语是否有解释（如"APN""VoLTE""IMS"是否需要用户理解）。
++   - 用户是否做得到：核心操作是否在用户能力范围内（老年用户、下沉市场用户）。
++   - 用户是否愿意做：流程是否足够简单、价值是否足够清晰。
++   - 用户是否找得到：核心功能入口是否在 3 次点击内可达。
++   - 重点看：术语通俗化程度、核心功能可达性、操作复杂度、价值传达清晰度。
++
++2. **客户视角（B 端政企客户）**
++   - 是否满足企业管理需求：多账号管理、权限分配、费用管控、报表导出。
++   - 是否满足 IT 集成需求：API 对接、数据同步、SSO 单点登录、审计日志。
++   - 是否满足运营需求：批量操作、审批流程、SLA 保障、专属客户经理。
++   - 重点看：企业管理功能完整度、集成能力、运营支撑功能。
++
++3. **老板视角（管理层）**
++   - 老板关心的指标是否有体现：用户规模、ARPU、转化率、留存率、NPS。
++   - 产品是否支撑经营决策：数据看板、趋势分析、预警机制。
++   - ROI 是否可衡量：投入产出比是否清晰、成本是否可控。
++   - 风险是否可控：合规风险、安全风险、舆情风险是否有预案。
++   - 重点看：经营数据可视化、决策支撑能力、风险管控机制。
++
++4. **视角一致性**
++   - C 端用户体验与 B 端管理需求是否冲突。
++   - 老板视角的管控需求是否过度影响了 C 端体验。
++   - 不同视角的优先级是否在产品设计中得到平衡。
++   - 重点看：视角冲突清单、优先级平衡策略。
++
++### 输出要求
++
++- 分别从 C 端、B 端、老板视角列出"关心但产品未覆盖"的需求清单。
++- 列出视角冲突点及建议的平衡方案。
++- 给出视角补全建议，标注优先级。
++
++## 四、UI 交互主流设计审查
++
++适用于审查产品 UI 交互设计是否符合当前主流设计趋势和平台规范。
++
++### 审查框架
++
++1. **设计规范符合度**
++   - iOS / Android 平台规范：是否遵循 Human Interface Guidelines / Material Design。
++   - 运营商品牌规范：是否遵循本运营商的 VI 规范、UI 组件库。
++   - Web 端规范：是否遵循 W3C 无障碍标准、响应式设计规范。
++   - 重点看：导航模式、按钮规范、字体规范、色彩规范、图标规范。
++
++2. **信息架构**
++   - 导航结构是否合理：层级不超过 3 级、核心功能在首屏可达。
++   - 信息分组是否清晰：同类功能聚合、不同功能分离、标签页不超过 5 个。
++   - 信息密度是否适当：不过载也不过空、关键信息突出。
++   - 重点看：导航层级、Tab 数量、首屏信息密度、信息分组逻辑。
++
++3. **交互模式**
++   - 是否使用主流交互模式：下拉刷新、左滑删除、长按菜单、底部弹窗等用户熟悉的模式。
++   - 手势操作是否符合直觉：滑动方向、点击区域、防误触。
++   - 反馈是否即时：点击有反馈、加载有提示、操作有结果。
++   - 重点看：交互模式清单、手势一致性、反馈及时性、防误触设计。
++
++4. **视觉设计**
++   - 色彩体系是否统一：主色、辅助色、语义色（成功/警告/错误）是否规范。
++   - 字体层级是否清晰：标题、正文、辅助文字的字号和字重是否有明确层级。
++   - 图标风格是否统一：线性/面性/双色风格是否一致、是否有自制和混用。
++   - 重点看：色彩一致性、字体层级、图标统一性、留白比例。
++
++5. **适配与性能**
++   - 多设备适配：iPhone SE 到 Pro Max、折叠屏、平板、Web 端。
++   - 暗色模式：是否支持、切换是否流畅、色彩对比度是否达标。
++   - 性能体验：首屏加载 < 2s、操作响应 < 200ms、滚动是否流畅。
++   - 重点看：适配清单、暗色模式完整度、性能指标。
++
++### 输出要求
++
++- 列出不符合主流设计的具体页面和元素，附截图说明（如有）。
++- 给出对标参考（如"参考微信/支付宝/美团的做法"）。
++- 按页面/模块组织问题清单，标注严重等级。
++
++## 五、反人类设计与易用性审查
++
++适用于审查产品是否存在反人类设计、易用性问题、无障碍缺陷。
++
++### 审查框架
++
++1. **反人类设计识别**
++   - 强制操作：强制注册、强制授权、强制升级、强制跳转。
++   - 隐藏信息：费用隐藏、条款折叠、默认勾选、诱导操作。
++   - 阻断操作：返回即清空、退出即丢失、断网即崩溃、切后台即重置。
++   - 骚扰设计：频繁弹窗、无法关闭的广告、强制通知、自动下载。
++   - 重点看：强制操作清单、隐藏信息清单、数据丢失场景、骚扰频次。
++
++2. **易用性问题**
++   - 操作复杂度：核心任务完成步数是否超出合理范围（C 端 ≤ 5 步、B 端 ≤ 8 步）。
++   - 认知负荷：是否需要用户记忆信息、是否需要来回切换页面。
++   - 错误恢复：误操作后能否撤销、能否回退、数据能否恢复。
++   - 帮助体系：是否有引导教程、FAQ、客服入口、操作提示。
++   - 重点看：任务完成步数、认知负荷评估、撤销能力、帮助体系完整度。
++
++3. **无障碍设计**
++   - 视觉无障碍：色彩对比度 ≥ 4.5:1、字体可放大、支持读屏。
++   - 听觉无障碍：音视频是否有字幕、是否有文字替代。
++   - 运动无障碍：是否支持语音操作、是否减少精细操作。
++   - 认知无障碍：是否使用简单语言、是否提供操作预测。
++   - 重点看：对比度合规率、读屏兼容性、字号可调性、语音操作支持。
++
++4. **特殊人群适配**
++   - 老年用户：字体大小、操作简化、语音引导、防诈骗提示。
++   - 障碍用户：无障碍模式、辅助功能、紧急联系。
++   - 下沉市场用户：语言通俗、图标直观、操作引导、离线能力。
++   - 重点看：适老化功能清单、无障碍模式、通俗易懂程度。
++
++5. **边界场景体验**
++   - 弱网/断网：是否有离线缓存、断网提示、重连机制。
++   - 低端设备：是否适配低分辨率、是否控制内存占用、是否有轻量版。
++   - 异常数据：空数据、超大数据、特殊字符、时区差异。
++   - 重点看：弱网体验、低端设备适配、异常数据处理。
++
++### 输出要求
++
++- 列出所有反人类设计，按"强制 > 隐藏 > 阻断 > 骚扰"排序。
++- 列出易用性问题清单，标注影响人群和严重等级。
++- 给出无障碍改进清单和特殊人群适配建议。
++
++## 六、产品改进建议
++
++在前五大维度审查基础上，输出系统性改进建议。
++
++### 建议框架
++
++1. **问题优先级矩阵**
++   - P0（阻断级）：影响核心业务完成、存在数据安全风险、违反法规。
++   - P1（严重级）：影响用户体验、降低业务效率、存在流程漏洞。
++   - P2（优化级）：体验瑕疵、设计不一致、性能可优化。
++   - P3（增强级）：功能增强、创新机会、前瞻性布局。
++
++2. **改进路线图**
++   - 立即修复（1-2 周）：P0 问题、安全漏洞、流程断点。
++   - 短期优化（1 个月）：P1 问题、核心体验优化、主流设计对齐。
++   - 中期演进（3 个月）：P2 问题、功能增强、无障碍改造。
++   - 长期规划（6 个月+）：P3 建议、创新功能、行业领先布局。
++
++3. **改进方案结构**
++   - 每条建议包含：问题描述 → 影响范围 → 建议方案 → 预期效果 → 实施难度。
++   - 建议方案要具体到交互层面：如"将三步确认流程合并为一步，增加二次确认弹窗"。
++   - 预期效果要可衡量：如"预计减少 30% 的操作放弃率""预计提升 NPS 5 分"。
++
++4. **资源与可行性评估**
++   - 改进所需资源：设计、开发、测试的人力预估。
++   - 技术可行性：是否依赖底层系统改造、是否需要跨团队协作。
++   - 风险评估：改进是否可能影响现有功能、是否有回滚方案。
++   - 重点看：资源需求清单、技术依赖、风险预案。
++
++### 输出要求
++
++- 生成"改进优先级矩阵表"，覆盖所有维度的问题。
++- 给出分阶段的改进路线图。
++- 每条建议附实施难度和预期效果评估。
++
++## 标准输出模板
++
++当用户没有指定输出格式时，按以下结构回答：
++
++1. **审查概述**：说明审查对象、范围、方法、总体评价。
++2. **维度一：业务流程合理性**：问题清单 + 严重等级 + 修复建议。
++3. **维度二：功能领先性**：对标矩阵 + 创新清单 + 提升路径。
++4. **维度三：客户与老板视角**：视角覆盖度评估 + 缺失需求 + 平衡建议。
++5. **维度四：UI 交互主流设计**：规范符合度 + 问题清单 + 对标参考。
++6. **维度五：反人类设计与易用性**：问题清单 + 影响人群 + 改进建议。
++7. **维度六：改进建议**：优先级矩阵 + 路线图 + 资源评估。
++8. **总结**：核心结论 + 最紧迫的 3-5 项改进。
++
++## 最少必要材料清单
++
++如果用户只给出审查请求，没有提供产品材料，先提醒需要以下材料，并可基于经验给初步审查框架：
++
++- 产品基本信息：产品名称、所属运营商、目标用户群体、核心业务场景。
++- 产品访问方式：App 下载链接、Web 地址、测试账号（如有）。
++- 产品文档：PRD 文档、交互稿/设计稿、技术架构文档（如涉及）。
++- 业务背景：产品定位、竞品参考、关键业务指标。
++- 用户数据（如有）：日活/月活、核心流程转化率、用户反馈/投诉数据、NPS 评分。
++- 已知问题：已收集的用户反馈、已知 bug 列表、历史审查报告。
++
++## 语言风格
++
++- 使用产品审查专业语言，结论明确、证据充分、建议可执行。
++- 用户要求汇报材料时，输出适合管理层阅读的摘要版（结论 + 优先级 + 资源）。
++- 用户要求设计团队执行时，输出适合设计师/开发执行的详细版（问题 + 截图标注 + 方案）。
++- 用户要求深度审查时，输出全维度详细分析。
++- 问题描述使用"现象 + 原因 + 影响 + 建议"四段式表达。
++- 严重等级统一使用 P0-P3 标注，避免"严重""一般"等模糊表述。
+diff --git a/src/QianYuan.Api/Controllers/ImagesController.cs b/src/QianYuan.Api/Controllers/ImagesController.cs
+index c797805..54c5226 100644
+--- a/src/QianYuan.Api/Controllers/ImagesController.cs
++++ b/src/QianYuan.Api/Controllers/ImagesController.cs
+@@ -65,13 +65,14 @@ public sealed class ImagesController : ControllerBase
+ 
+         try
+         {
+-            using var response = await SendGenerationRequestWithRetry(http, endpoint, req, provider, ct).ConfigureAwait(false);
++            var (response, model) = await SendGenerationRequestWithRetry(http, endpoint, req, provider, ct).ConfigureAwait(false);
++            using var responseScope = response;
+             var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+             if (!response.IsSuccessStatusCode)
+                 return StatusCode((int)response.StatusCode, new
+                 {
+                     error = ExtractProviderError(body),
+-                    model = ResolveImageModel(req, provider),
++                    model,
+                     provider = provider.ProviderId,
+                 });
+ 
+@@ -85,7 +86,7 @@ public sealed class ImagesController : ControllerBase
+             return Ok(new ImageGenerationResponse
+             {
+                 Provider = provider.ProviderId,
+-                Model = ResolveImageModel(req, provider),
++                Model = model,
+                 Url = url,
+                 Base64 = base64,
+                 Mime = "image/png",
+@@ -119,35 +120,46 @@ public sealed class ImagesController : ControllerBase
+             ?? _options.OpenAICompatProviders.FirstOrDefault();
+     }
+ 
+-    private async Task<HttpResponseMessage> SendGenerationRequestWithRetry(
++    private async Task<(HttpResponseMessage Response, string Model)> SendGenerationRequestWithRetry(
+         HttpClient http,
+         string endpoint,
+         ImageGenerationRequest req,
+         OpenAIProviderOptions provider,
+         CancellationToken ct)
+     {
+-        const int maxAttempts = 2;
+-        for (var attempt = 1; ; attempt++)
++        var candidateModels = ImageGenerationModelResolver.GetCandidateModels(req, provider);
++        for (var attempt = 0; attempt < candidateModels.Count; attempt++)
+         {
++            var model = candidateModels[attempt];
+             try
+             {
+-                return await SendGenerationRequest(http, endpoint, req, provider, ct).ConfigureAwait(false);
++                var response = await SendGenerationRequest(http, endpoint, req, model, ct).ConfigureAwait(false);
++                var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
++                if (ShouldRetryWithFallbackModel(response.StatusCode, body, model, attempt, candidateModels.Count))
++                {
++                    response.Dispose();
++                    _logger.LogWarning("Image provider rejected model {Model} with {StatusCode}; retrying with fallback model", model, response.StatusCode);
++                    continue;
++                }
++
++                return (response, model);
+             }
+-            catch (HttpRequestException ex) when (attempt < maxAttempts && IsConnectionReset(ex))
++            catch (HttpRequestException ex) when (attempt < candidateModels.Count - 1 && IsConnectionReset(ex))
+             {
+-                _logger.LogWarning(ex, "Image provider reset the connection on attempt {Attempt}; retrying once", attempt);
++                _logger.LogWarning(ex, "Image provider reset the connection on attempt {Attempt}; retrying once", attempt + 1);
+             }
+         }
++
++        throw new HttpRequestException("Image generation failed after exhausting all candidate models.");
+     }
+ 
+     private static async Task<HttpResponseMessage> SendGenerationRequest(
+         HttpClient http,
+         string endpoint,
+         ImageGenerationRequest req,
+-        OpenAIProviderOptions provider,
++        string model,
+         CancellationToken ct)
+     {
+-        var model = ResolveImageModel(req, provider);
+         var supportsResponseFormat = SupportsResponseFormat(model);
+         if (string.Equals(endpoint, "images/edits", StringComparison.OrdinalIgnoreCase))
+         {
+@@ -228,6 +240,25 @@ public sealed class ImagesController : ControllerBase
+     private static string ResolveImageModel(ImageGenerationRequest req, OpenAIProviderOptions provider)
+         => string.IsNullOrWhiteSpace(req.Model) ? provider.ImageModel ?? provider.DefaultModel : req.Model;
+ 
++    private static bool ShouldRetryWithFallbackModel(HttpStatusCode statusCode, string body, string model, int attempt, int candidateCount)
++    {
++        if (attempt >= candidateCount - 1 || !IsGptImageModel(model))
++            return false;
++
++        if (statusCode is not (HttpStatusCode.BadRequest or HttpStatusCode.NotFound or HttpStatusCode.InternalServerError))
++            return false;
++
++        var error = body.ToLowerInvariant();
++        return error.Contains("model", StringComparison.Ordinal)
++            && (error.Contains("not found", StringComparison.Ordinal)
++                || error.Contains("does not exist", StringComparison.Ordinal)
++                || error.Contains("unsupported", StringComparison.Ordinal)
++                || error.Contains("unknown", StringComparison.Ordinal));
++    }
++
++    private static bool IsGptImageModel(string? model)
++        => !string.IsNullOrWhiteSpace(model) && model.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase);
++
+     private static bool SupportsResponseFormat(string model)
+         => !model.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase);
+ 
+@@ -261,6 +292,28 @@ public sealed class ImagesController : ControllerBase
+     }
+ }
+ 
++public static class ImageGenerationModelResolver
++{
++    public static IReadOnlyList<string> GetCandidateModels(ImageGenerationRequest req, OpenAIProviderOptions provider)
++    {
++        var requestedModel = req.Model;
++        var configuredModel = provider.ImageModel ?? provider.DefaultModel;
++        if (!string.IsNullOrWhiteSpace(requestedModel))
++            return string.Equals(requestedModel, "gpt-image-2", StringComparison.OrdinalIgnoreCase)
++                ? new[] { requestedModel, "gpt-image-1" }
++                : new[] { requestedModel };
++
++        if (string.IsNullOrWhiteSpace(configuredModel))
++            return Array.Empty<string>();
++
++        return string.Equals(configuredModel, "gpt-image-2", StringComparison.OrdinalIgnoreCase)
++            ? new[] { configuredModel, "gpt-image-1" }
++            : string.Equals(configuredModel, "gpt-image-1", StringComparison.OrdinalIgnoreCase)
++                ? new[] { configuredModel, "gpt-image-2" }
++                : new[] { configuredModel };
++    }
++}
++
+ public sealed class ImageGenerationRequest
+ {
+     public string Mode { get; set; } = "text-to-image";
+diff --git a/src/QianYuan.Api/appsettings.json b/src/QianYuan.Api/appsettings.json
+index 4afc109..66fddf1 100644
+--- a/src/QianYuan.Api/appsettings.json
++++ b/src/QianYuan.Api/appsettings.json
+@@ -33,7 +33,7 @@
+         "ImageModel": "gpt-image-2",
+         "SupportsVision": true,
+         "SupportsSamplingParams": false,
+-        "Models": [ "gpt-image-2", "gpt-5.5" ]
++        "Models": [ "gpt-image-1", "gpt-image-2", "gpt-5.5" ]
+       },
+       {
+         "ProviderId": "kimi",
+diff --git a/src/QianYuan.Providers.OpenAICompat/OpenAICompatProvider.cs b/src/QianYuan.Providers.OpenAICompat/OpenAICompatProvider.cs
+index 9f299b3..e662f14 100644
+--- a/src/QianYuan.Providers.OpenAICompat/OpenAICompatProvider.cs
++++ b/src/QianYuan.Providers.OpenAICompat/OpenAICompatProvider.cs
+@@ -11,6 +11,20 @@ using QianYuan.Core.Streaming;
+ 
+ namespace QianYuan.Providers.OpenAICompat;
+ 
++public static class OpenAICompatModelResolver
++{
++    public static string ResolveChatModel(string? requestedModel, string defaultModel)
++    {
++        if (string.IsNullOrWhiteSpace(requestedModel))
++            return defaultModel;
++
++        return IsImageGenerationModel(requestedModel) ? defaultModel : requestedModel;
++    }
++
++    public static bool IsImageGenerationModel(string? model)
++        => !string.IsNullOrWhiteSpace(model) && model.StartsWith("gpt-image", StringComparison.OrdinalIgnoreCase);
++}
++
+ /// <summary>
+ /// OpenAI Chat Completions compatible provider.
+ /// Supports streaming SSE, multi-part user content (vision), tool calls (including parallel and streamed args).
+@@ -235,7 +249,7 @@ public sealed class OpenAICompatProvider : ILlmProvider
+ 
+         var body = new Dictionary<string, object?>
+         {
+-            ["model"] = request.Options.Model ?? _opts.DefaultModel,
++            ["model"] = OpenAICompatModelResolver.ResolveChatModel(request.Options.Model, _opts.DefaultModel),
+             ["messages"] = messages,
+             ["stream"] = stream,
+         };
+diff --git a/tests/QianYuan.Core.Tests/ImageGenerationTests.cs b/tests/QianYuan.Core.Tests/ImageGenerationTests.cs
+new file mode 100644
+index 0000000..ddea6df
+--- /dev/null
++++ b/tests/QianYuan.Core.Tests/ImageGenerationTests.cs
+@@ -0,0 +1,48 @@
++using FluentAssertions;
++using QianYuan.Api.Configuration;
++using QianYuan.Api.Controllers;
++using QianYuan.Providers.OpenAICompat;
++using Xunit;
++
++namespace QianYuan.Core.Tests;
++
++public class ImageGenerationTests
++{
++    [Fact]
++    public void GetCandidateModels_ForGptImage2_ShouldIncludeFallbackGptImage1()
++    {
++        var req = new ImageGenerationRequest { Model = "gpt-image-2" };
++        var provider = new OpenAIProviderOptions { ImageModel = "gpt-image-1" };
++
++        var candidates = ImageGenerationModelResolver.GetCandidateModels(req, provider);
++
++        candidates.Should().Equal("gpt-image-2", "gpt-image-1");
++    }
++
++    [Fact]
++    public void GetCandidateModels_ForNonGptImageModel_ShouldReturnSingleModel()
++    {
++        var req = new ImageGenerationRequest { Model = "gpt-4o-mini" };
++        var provider = new OpenAIProviderOptions();
++
++        var candidates = ImageGenerationModelResolver.GetCandidateModels(req, provider);
++
++        candidates.Should().Equal("gpt-4o-mini");
++    }
++
++    [Fact]
++    public void ResolveChatModel_ForGptImage2_ShouldFallbackToDefaultChatModel()
++    {
++        var resolved = OpenAICompatModelResolver.ResolveChatModel("gpt-image-2", "gpt-5.5");
++
++        resolved.Should().Be("gpt-5.5");
++    }
++
++    [Fact]
++    public void ResolveChatModel_ForRegularModel_ShouldKeepRequestedModel()
++    {
++        var resolved = OpenAICompatModelResolver.ResolveChatModel("gpt-4o-mini", "gpt-5.5");
++
++        resolved.Should().Be("gpt-4o-mini");
++    }
++}

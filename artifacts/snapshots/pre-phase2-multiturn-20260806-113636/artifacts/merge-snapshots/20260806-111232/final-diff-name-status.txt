@@ -1,0 +1,2 @@
+﻿M	src/QianYuan.Api/Controllers/ImagesController.cs
+M	src/QianYuan.Api/appsettings.json

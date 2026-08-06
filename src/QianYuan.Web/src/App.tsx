@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Composer } from './components/Composer'
-import { ChatMessageView } from './components/ChatMessageView'
+import { ChatMessageView, type DisplayMessage } from './components/ChatMessageView'
 import { AgentStore } from './components/AgentStore'
 import { ExpertMarketplace } from './components/ExpertMarketplace'
 import { AuthPage } from './components/AuthPage'
@@ -9,10 +9,10 @@ import { CreditsPanel } from './components/CreditsPanel'
 import { WorkTasksPanel } from './components/WorkTasksPanel'
 import { AccountMenu } from './components/AccountMenu'
 import { useChat } from './hooks/useChat'
-import type { AuthResponse, ComposerMode, ImagePart, ExpertDetailDto, WorkspaceContext } from './types/api'
-import { getExpertPrompt, getMe, getStoredAuth, logout, storeAuth } from './services/api'
+import type { AuthResponse, ComposerMode, ImageGenerationOptions, ImagePart, ExpertDetailDto, WorkspaceContext } from './types/api'
+import { createSession, getExpertPrompt, getMe, getStoredAuth, logout, storeAuth } from './services/api'
 
-type ActiveExpert = { id: string; name: string; avatarUrl: string; profession: string; systemPrompt: string }
+type ActiveExpert = { id: string; name: string; avatarUrl: string; profession: string; systemPrompt: string; boundAgentId?: string | null }
 
 export default function App() {
   const [auth, setAuth] = useState<AuthResponse | null>(() => getStoredAuth())
@@ -22,7 +22,8 @@ export default function App() {
   const [provider, setProvider] = useState<string | null>(null)
   const [model, setModel] = useState<string | null>(null)
   const [skills, setSkills] = useState<string[]>([])
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(() => localStorage.getItem('workpartner.sessionId'))
+  const [sessionListVersion, setSessionListVersion] = useState(0)
   const [showCredits, setShowCredits] = useState(false)
   const [showTasks, setShowTasks] = useState(false)
   const [showAccountMenu, setShowAccountMenu] = useState(false)
@@ -32,7 +33,7 @@ export default function App() {
   const [accountNotice, setAccountNotice] = useState<{ title: string; body: string } | null>(null)
   const [authPrompt, setAuthPrompt] = useState<{ reason: string; mode?: 'login' | 'register' } | null>(null)
 
-  const { messages, busy, send, abort, reset } = useChat({
+  const { messages, busy, send, abort, reset, regenerate } = useChat({
     agentId, provider, model, skills, sessionId,
     systemPrompt: activeExpert?.systemPrompt ?? null,
     onSession: id => setSessionId(id),
@@ -48,6 +49,11 @@ export default function App() {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('workpartner.theme', theme)
   }, [theme])
+
+  useEffect(() => {
+    if (sessionId) localStorage.setItem('workpartner.sessionId', sessionId)
+    else localStorage.removeItem('workpartner.sessionId')
+  }, [sessionId])
 
   useEffect(() => {
     if (!auth) return
@@ -93,27 +99,54 @@ export default function App() {
     return true
   }
 
-  function startNewSession() {
+  async function startNewSession() {
+    if (!requireAuth('登录或注册后即可新建并保存会话。')) return
+
+    abort()
     reset()
-    setSessionId(null)
+    setActiveExpert(null)
+    setComposerSeed(s => (s.text ? { text: '', nonce: s.nonce } : s))
+    setView('chat')
+    setShowTasks(false)
+    setShowCredits(false)
+
+    try {
+      const session = await createSession({ title: '新会话', agentId: agentId ?? undefined })
+      setSessionId(session.sessionId)
+      setSessionListVersion(v => v + 1)
+    } catch (err) {
+      console.error(err)
+      setAccountNotice({ title: '新建会话失败', body: String(err instanceof Error ? err.message : err) })
+    }
+  }
+
+  function loadSession(id: string) {
+    abort()
     setActiveExpert(null)
     setView('chat')
     setShowTasks(false)
     setShowCredits(false)
+    setSessionId(id)
   }
 
   const hasMessages = messages.length > 0
+  const hasActiveChat = hasMessages
 
   function seedShortcut(text: string) {
     setView('chat')
     setComposerSeed(s => ({ text, nonce: s.nonce + 1 }))
   }
 
-  function guardedSubmit(text: string, images: ImagePart[], mode: ComposerMode, workspace?: WorkspaceContext) {
-    if (!requireAuth('登录或注册后即可使用云端大模型、保存会话，并进入 AI 专家团工作台。')) return
+  function guardedSubmit(text: string, images: ImagePart[], mode: ComposerMode, workspace?: WorkspaceContext, imageOptions?: ImageGenerationOptions) {
+    if (!requireAuth('登录或注册后即可使用云端大模型、保存会话，并进入 AI 专家组工作台。')) return
     // Clear any pending composer seed so the chat-view composer doesn't re-apply it on mount.
     setComposerSeed(s => (s.text ? { text: '', nonce: s.nonce } : s))
-    send(text, images, mode, workspace)
+    send(text, images, mode, workspace, imageOptions)
+  }
+
+  function regenerateUserMessage(message: DisplayMessage, nextText?: string) {
+    if (message.sourceIndex === undefined) return
+    regenerate(message.sourceIndex, nextText ?? message.text)
   }
 
   function openAccountMenu(placement: 'topbar' | 'sidebar') {
@@ -123,17 +156,20 @@ export default function App() {
 
   async function summonExpert(prompt: string, expert: ExpertDetailDto) {
     setView('chat')
-    setAgentId(null)
+    setAgentId(expert.boundAgentId ?? null)
     setComposerSeed(s => ({ text: prompt, nonce: s.nonce + 1 }))
     const base: ActiveExpert = {
       id: expert.id, name: expert.name, avatarUrl: expert.avatarUrl,
       profession: expert.profession,
+      boundAgentId: expert.boundAgentId,
       systemPrompt: `你是${expert.name}，一位${expert.profession}。${expert.description}`,
     }
     setActiveExpert(base)
     try {
-      const { systemPrompt } = await getExpertPrompt(expert.id)
-      if (systemPrompt) setActiveExpert({ ...base, systemPrompt })
+      const { systemPrompt, boundAgentId } = await getExpertPrompt(expert.id)
+      const next = { ...base, systemPrompt: systemPrompt || base.systemPrompt, boundAgentId: boundAgentId ?? base.boundAgentId }
+      setActiveExpert(next)
+      setAgentId(next.boundAgentId ?? null)
     } catch { /* keep fallback persona */ }
   }
 
@@ -150,18 +186,18 @@ export default function App() {
         selectedSkills={skills} onSkillsChange={setSkills}
         currentSessionId={sessionId}
         onNewSession={startNewSession}
-        onLoadSession={setSessionId}
+        onLoadSession={loadSession}
+        sessionListVersion={sessionListVersion}
       />
       {view === 'agent-store' ? <AgentStore onBack={() => setView('chat')} />
         : view === 'experts' ? <ExpertMarketplace
           onBack={() => setView('chat')}
-          onOpenSkills={() => setView('agent-store')}
           onLaunch={summonExpert}
         />
         : <div className="main">
-        {hasMessages ? <>
+        {hasActiveChat ? <>
           <div className="chat" ref={scrollerRef}>
-            {messages.map(m => <ChatMessageView key={m.id} msg={m} />)}
+            {messages.map(m => <ChatMessageView key={m.id} msg={m} onRegenerateUserMessage={regenerateUserMessage} />)}
           </div>
           <Composer
             busy={busy}
@@ -199,7 +235,7 @@ export default function App() {
           seedNonce={composerSeed.nonce}
         />}
       </div>}
-      {showTasks && auth && <WorkTasksPanel provider={provider} model={model} onClose={() => setShowTasks(false)} />}
+      {showTasks && auth && <WorkTasksPanel provider={provider ?? undefined} model={model ?? undefined} onClose={() => setShowTasks(false)} />}
       {showCredits && auth && <CreditsPanel onClose={() => setShowCredits(false)} />}
       {showAccountMenu && auth && <AccountMenu
         user={auth.user}
@@ -236,9 +272,10 @@ export default function App() {
   )
 }
 
+
 interface HomeLandingProps {
   busy: boolean
-  onSubmit: (text: string, images: ImagePart[], mode: ComposerMode, workspace?: WorkspaceContext) => void
+  onSubmit: (text: string, images: ImagePart[], mode: ComposerMode, workspace?: WorkspaceContext, imageOptions?: ImageGenerationOptions) => void
   onAbort: () => void
   onShortcut: (text: string) => void
   selectedAgent: string | null
@@ -281,7 +318,7 @@ function HomeLanding({
     <main className="home-stage">
       <section className="home-hero">
         <div className="hero-copy">
-          <h1>AI WorkPartner<br />你的AI智能伙伴</h1>
+          <h1>AI WorkPartner<br />你的 AI 智能伙伴</h1>
           <div className="home-mode-tabs" aria-label="常用工作模式">
             {workModes.map(item => (
               <button
@@ -332,3 +369,5 @@ function HomeLanding({
     </main>
   )
 }
+
+

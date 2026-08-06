@@ -30,6 +30,7 @@ export interface StreamRequest {
   sessionId?: string
   ownerId?: string
   userText: string
+  reuseLastUserMessage?: boolean
   images?: ImagePart[]
   provider?: string
   model?: string
@@ -49,6 +50,10 @@ export interface WorkspaceContext {
   permission?: string
 }
 
+export interface ImageGenerationOptions {
+  optimizePrompt?: boolean
+}
+
 export interface ImageGenerationRequest {
   mode: 'text-to-image' | 'image-to-image'
   prompt: string
@@ -56,6 +61,7 @@ export interface ImageGenerationRequest {
   provider?: string
   model?: string
   size?: string
+  optimizePrompt?: boolean
 }
 
 export interface ImageGenerationResponse {
@@ -65,14 +71,72 @@ export interface ImageGenerationResponse {
   base64?: string | null
   mime: string
   revisedPrompt?: string | null
+  optimizedPrompt?: string | null
+  promptOptimizerProvider?: string | null
+  promptOptimizerModel?: string | null
+  promptOptimizationSkipped?: boolean
+  promptOptimizationError?: string | null
 }
 
 export interface AgentDto { id: string; name: string; description: string; tags: string[] }
 export interface SkillManifestDto {
   id: string; name: string; description: string; tags: string[]
   approximateToolCount: number; requiresNetwork: boolean; requiresFilesystem: boolean
+  category?: string
+  triggerPhrases?: string[]
   enabled: boolean
 }
+
+export interface SkillCategoryDto { id: string; name: string; marketCount: number; installedCount: number }
+export interface SkillMarketEntryDto {
+  id: string
+  packageId: string
+  packageName: string
+  name: string
+  description: string
+  category: string
+  tags: string[]
+  triggerPhrases: string[]
+  source: string
+  sourceUrl?: string | null
+  installed: boolean
+  installedSkillId?: string | null
+  enabled: boolean
+}
+export interface SkillPackageDto {
+  id: string
+  name: string
+  description: string
+  category: string
+  sortOrder: number
+  entries: SkillMarketEntryDto[]
+}
+export interface InstalledSkillDto {
+  skillId: string
+  marketEntryId?: string | null
+  name: string
+  description: string
+  category: string
+  tags: string[]
+  triggerPhrases: string[]
+  scope: string
+  installPath: string
+  enabled: boolean
+  installedAt: string
+  updatedAt: string
+}
+export interface InstallSkillRequest { marketEntryId: string; enabled?: boolean }
+export interface CreateSkillRequest {
+  id: string
+  name: string
+  description: string
+  body: string
+  category?: string | null
+  tags?: string[] | null
+  triggerPhrases?: string[] | null
+  scope?: string | null
+}
+
 export interface SkillToolDto { name: string; description?: string; jsonSchema?: string; skillId?: string }
 export interface SkillToolsResponse {
   skillId: string
@@ -90,10 +154,35 @@ export interface ProviderDto {
   providerId: string; defaultModel: string; models: string[]; capabilities: string[]
 }
 export interface ProvidersResponse { defaultProviderId: string | null; providers: ProviderDto[] }
+export type ChatRoleDto = 'System' | 'User' | 'Assistant' | 'Tool'
+export type ContentKindDto = 'Text' | 'Image' | 'Audio' | 'File' | 'ToolCall' | 'ToolResult'
+export interface ContentPartDto {
+  kind: ContentKindDto | number
+  text?: string | null
+  dataUrlOrBase64?: string | null
+  mimeType?: string | null
+  name?: string | null
+  toolCallId?: string | null
+  jsonPayload?: string | null
+}
+export interface ChatMessageDto {
+  role: ChatRoleDto | number
+  parts: ContentPartDto[]
+  name?: string | null
+  meta?: Record<string, string> | null
+}
 export interface SessionSummaryDto {
   sessionId: string; title?: string | null; agentId?: string | null
   messageCount: number; createdAt: string; updatedAt: string
 }
+export interface SessionStateDto extends SessionSummaryDto {
+  ownerId?: string | null
+  messages: ChatMessageDto[]
+  metadata?: Record<string, string> | null
+}
+export interface SessionCreateRequest { sessionId?: string; ownerId?: string; title?: string; agentId?: string }
+export interface SessionUpdateRequest { title?: string | null; agentId?: string | null }
+export interface SessionRegenerateRequest { userMessageIndex?: number | null; userText?: string | null }
 
 export interface AgentStoreSkillDto {
   id: number
@@ -253,6 +342,7 @@ export interface WorkStepDto {
   status: string
   agentId?: string | null
   summary?: string | null
+  executionMode: string
   createdAt: string
   updatedAt: string
 }
@@ -307,6 +397,66 @@ export interface ExpertTeamDto {
   members: ExpertTeamMemberDto[]
 }
 
+
+export interface CreateExpertTeamMemberRequest {
+  roleId: string
+  displayName: string
+  agentId?: string | null
+  responsibility: string
+  executionMode?: string | null
+}
+
+export interface UpdateExpertTeamMemberRequest extends CreateExpertTeamMemberRequest {
+  memberOrder?: number | null
+  enabled?: boolean | null
+}
+
+export interface CreateExpertTeamRequest {
+  name: string
+  description?: string | null
+  scenario?: string | null
+  members?: CreateExpertTeamMemberRequest[] | null
+}
+
+export interface UpdateExpertTeamRequest {
+  name: string
+  description?: string | null
+  scenario?: string | null
+  enabled?: boolean | null
+}
+
+export interface ExpertTeamTemplateMemberDto {
+  roleId: string
+  displayName: string
+  profession: string
+  responsibility: string
+  executionMode: string
+}
+
+export interface ExpertTeamTemplateDto {
+  id: string
+  name: string
+  description: string
+  scenario: string
+  categoryId: string
+  tags: string[]
+  defaultInitPrompt: string
+  members: ExpertTeamTemplateMemberDto[]
+}
+
+export interface ExpertTeamExecutionEventDto {
+  type: string
+  taskId: string
+  teamId?: string | null
+  stepId?: string | null
+  stepOrder?: number | null
+  stepName?: string | null
+  executionMode?: string | null
+  status: string
+  message?: string | null
+  at: string
+}
+
 // Expert marketplace (WorkBuddy-style catalog)
 export interface ExpertCategoryDto {
   id: string
@@ -327,6 +477,8 @@ export interface ExpertSummaryDto {
   isOpc: boolean
   tags: string[]
   author?: string | null
+  isCustom: boolean
+  boundAgentId?: string | null
 }
 
 export interface ExpertDetailDto extends ExpertSummaryDto {
@@ -352,6 +504,35 @@ export interface ExpertListResultDto {
 export interface ExpertPromptDto {
   id: string
   systemPrompt: string
+  boundAgentId?: string | null
+}
+
+export interface CustomExpertUpsertRequest {
+  id?: string | null
+  name: string
+  profession: string
+  description: string
+  systemPrompt: string
+  categoryId?: string | null
+  avatarUrl?: string | null
+  tags?: string[] | null
+  quickPrompts?: string[] | null
+  boundAgentId?: string | null
+  author?: string | null
+}
+
+export interface ExpertChatRequest {
+  message: string
+  quickPrompt?: string | null
+  provider?: string | null
+  model?: string | null
+}
+
+export interface ExpertChatResponse {
+  expertId: string
+  boundAgentId?: string | null
+  content: string
+  chunks: string[]
 }
 
 // Knowledge base types

@@ -1,0 +1,117 @@
+name: E2E Selftest
+
+on:
+  workflow_dispatch:
+    inputs:
+      strict_chat_status:
+        description: Fail workflow unless chat_status is PASS
+        required: true
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+      model:
+        description: Chat model for provider openai
+        required: true
+        default: gpt-4o-mini
+        type: string
+
+jobs:
+  e2e-selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BASE_URL: http://127.0.0.1:5050
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build API
+        run: dotnet build src/QianYuan.Api/QianYuan.Api.csproj -c Release --no-restore
+
+      - name: Validate required secrets
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OPENAI_API_KEY}" ]; then
+            echo "OPENAI_API_KEY secret is required for chat selftest"
+            exit 1
+          fi
+
+      - name: Start API
+        env:
+          QianYuan__OpenAICompatProviders__0__BaseUrl: https://api.openai.com/v1
+          QianYuan__OpenAICompatProviders__0__ApiKey: ${{ secrets.OPENAI_API_KEY }}
+          QianYuan__OpenAICompatProviders__0__DefaultModel: ${{ inputs.model }}
+        run: |
+          set -euo pipefail
+          dotnet run --project src/QianYuan.Api --configuration Release --urls "$BASE_URL" > api.log 2>&1 &
+          echo $! > api.pid
+
+      - name: Wait for API health
+        run: |
+          set -euo pipefail
+          for i in {1..60}; do
+            code="$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/plans" || true)"
+            if [ "$code" = "200" ]; then
+              echo "API is ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to become healthy"
+          tail -n 200 api.log || true
+          exit 1
+
+      - name: Run e2e selftest
+        env:
+          PROVIDER: openai
+          MODEL: ${{ inputs.model }}
+          STRICT_CHAT_STATUS: ${{ inputs.strict_chat_status == 'true' && '1' || '0' }}
+          WORKDIR: ${{ github.workspace }}/artifacts/e2e-selftest
+        run: |
+          set -euo pipefail
+          rm -rf "$WORKDIR"
+          mkdir -p "$WORKDIR"
+          chmod +x scripts/e2e_selftest_auth_task_chat.sh
+          scripts/e2e_selftest_auth_task_chat.sh
+
+      - name: Stop API
+        if: always()
+        run: |
+          set -euo pipefail
+          if [ -f api.pid ]; then
+            kill "$(cat api.pid)" || true
+          fi
+
+      - name: Upload API log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-api-log
+          path: api.log
+          if-no-files-found: ignore
+
+      - name: Upload e2e artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-selftest-artifacts
+          path: artifacts/e2e-selftest
+          if-no-files-found: ignore

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
@@ -41,8 +42,11 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICreditService, CreditService>();
 builder.Services.AddScoped<IWorkTaskService, WorkTaskService>();
 builder.Services.AddScoped<IExpertTeamService, ExpertTeamService>();
+builder.Services.AddSingleton<IExpertTeamTemplateService, ExpertTeamTemplateService>();
+builder.Services.AddScoped<ISkillMarketplaceService, SkillMarketplaceService>();
 builder.Services.AddSingleton<IWorkTaskExecutionHarness, WorkTaskExecutionHarness>();
 builder.Services.AddSingleton<IExpertCatalogService, ExpertCatalogService>();
+builder.Services.AddScoped<ICustomExpertService, CustomExpertService>();
 builder.Services.AddHttpClient();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -234,7 +238,11 @@ else
     builder.Services.AddSingleton<QianYuan.Api.Services.IKnowledgeStore, QianYuan.Api.Services.VectorKnowledgeStore>();
 }
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
@@ -260,6 +268,7 @@ app.Services.RegisterMarkdownSkillsFromDirectories(qy.SkillDirectories.Select(d 
     IdPrefix = d.IdPrefix,
 }));
 app.Services.MountMcpSkills();
+await InitializeSkillMarketplaceAsync(app.Services);
 app.Services.RegisterAgentsFromServices();
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions { ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto });
@@ -290,6 +299,14 @@ app.MapGet("/", () => Results.Ok(new
 }));
 
 app.Run();
+
+
+static async Task InitializeSkillMarketplaceAsync(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var marketplace = scope.ServiceProvider.GetRequiredService<ISkillMarketplaceService>();
+    await marketplace.InitializeAsync();
+}
 
 static string ResolveSkillDirectory(string configuredPath, string contentRootPath)
 {

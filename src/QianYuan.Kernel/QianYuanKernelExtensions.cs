@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using QianYuan.Core.Abstractions;
 using QianYuan.Core.Memory;
 using QianYuan.Kernel.Agents;
+using QianYuan.Kernel.ReAct;
 using QianYuan.Kernel.Skills;
 
 namespace QianYuan.Kernel;
@@ -20,6 +21,7 @@ public static class QianYuanKernelExtensions
         services.TryAddSingleton<IAgentRegistry, AgentRegistry>();
         services.TryAddSingleton<ISkillManager, SkillManager>();
         services.TryAddSingleton<ISessionStore, InMemorySessionStore>();
+        services.TryAddSingleton<ITokenCounter, HeuristicTokenCounter>();
         return services;
     }
 

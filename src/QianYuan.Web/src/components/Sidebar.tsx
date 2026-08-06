@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import type {
   AgentDto, ProviderDto, SkillManifestDto, SessionSummaryDto,
 } from '../types/api'
 import {
-  listAgents, listProviders, listSkills, listSessions, deleteSession,
+  listAgents, listProviders, listSkills, listSessions, deleteSession, updateSession,
 } from '../services/api'
 import { SkillsManager } from './SkillsManager'
 import { KnowledgeManager } from './KnowledgeManager'
@@ -22,7 +22,8 @@ interface Props {
   selectedSkills: string[]
   onSkillsChange: (s: string[]) => void
   currentSessionId: string | null
-  onNewSession: () => void
+  onNewSession: () => void | Promise<void>
+  sessionListVersion?: number
   onLoadSession: (id: string) => void
 }
 
@@ -32,11 +33,12 @@ export function Sidebar(p: Props) {
   const [defaultProviderId, setDefaultProviderId] = useState<string | null>(null)
   const [skills, setSkills] = useState<SkillManifestDto[]>([])
   const [sessions, setSessions] = useState<SessionSummaryDto[]>([])
+  const [sessionQuery, setSessionQuery] = useState('')
   const [showSkillsManager, setShowSkillsManager] = useState(false)
   const [showKnowledgeManager, setShowKnowledgeManager] = useState(false)
 
   useEffect(() => {
-    Promise.all([listAgents(), listProviders(), listSkills(), listSessions()])
+    Promise.all([listAgents(), listProviders(), listSkills(), listSessions(sessionQuery)])
       .then(([a, pr, s, ss]) => {
         setAgents(a)
         setProviders(pr.providers)
@@ -49,9 +51,13 @@ export function Sidebar(p: Props) {
   }, [])
 
   useEffect(() => {
-    const t = setInterval(() => listSessions().then(setSessions).catch(() => {}), 5000)
+    const t = setInterval(() => reloadSessions(), 5000)
     return () => clearInterval(t)
-  }, [])
+  }, [sessionQuery])
+
+  useEffect(() => { reloadSessions() }, [sessionQuery])
+
+  useEffect(() => { reloadSessions() }, [p.sessionListVersion])
 
   function toggleSkill(id: string) {
     p.onSkillsChange(p.selectedSkills.includes(id)
@@ -67,34 +73,45 @@ export function Sidebar(p: Props) {
   }
 
   function reloadSkills() { listSkills().then(setSkills).catch(() => {}) }
+  function reloadSessions() { listSessions(sessionQuery).then(setSessions).catch(() => {}) }
+  async function renameSession(id: string, currentTitle?: string | null) {
+    const next = window.prompt('重命名会话', sanitizeSessionTitle(currentTitle) ?? '')
+    if (next === null) return
+    await updateSession(id, { title: next.trim() || null })
+    await reloadSessions()
+  }
+  async function removeSession(id: string) {
+    if (!window.confirm('确定删除这个会话吗？')) return
+    await deleteSession(id)
+    await reloadSessions()
+  }
 
   const selectedProviderModels =
     providers.find(x => x.providerId === p.selectedProvider)?.models ?? []
 
   const navItems = [
     { label: '新建会话', icon: '+', action: p.onNewSession, active: true },
-    { label: '助理', icon: 'A' },
-    { label: '专家', icon: 'E', action: p.onOpenExperts },
+    { label: '助手', icon: 'A' },
     { label: '项目', icon: 'P' },
-    { label: '专家·技能·连接器', icon: 'S', action: p.onOpenAgentStore },
+    { label: '专家·技能·连接器', icon: 'S', action: p.onOpenExperts },
     { label: '自动化', icon: 'R' },
     { label: '更多', icon: 'M' },
   ]
 
   const fallbackTasks = [
-    { title: '研究云快充切换特来电充...', time: '17小时前', fresh: false },
+    { title: '研究云快充切换特来电...', time: '17小时前', fresh: false },
     { title: 'AI WorkPartner版本区别对比', time: '2天前', fresh: false },
     { title: 'QQ音乐耳机播放问题排查', time: '2天前', fresh: false },
     { title: '对比能源管理平台产品', time: '', fresh: true },
     { title: '下载山东高考英语真题答案', time: '6天前', fresh: false },
-    { title: '询问专家团能力', time: '6天前', fresh: false },
+    { title: '询问专家组能力', time: '6天前', fresh: false },
   ]
 
   return (
     <aside className="sidebar">
       <div className="sidebar-nav">
         {navItems.map(item => (
-          <button key={item.label} className={`nav-item ${item.active ? 'active' : ''}`} onClick={item.action} type="button">
+          <button key={item.label} className={`nav-item ${item.active ? 'active' : ''}`} onClick={() => { void item.action?.() }} type="button">
             <span className="nav-icon">{item.icon}</span>
             <span>{item.label}</span>
             {item.label === '更多' && <em>资料库·灵感</em>}
@@ -109,7 +126,7 @@ export function Sidebar(p: Props) {
           <select className="field"
             value={p.selectedAgent ?? ''}
             onChange={e => p.onAgentChange(e.target.value || null)}>
-            <option value="">默认助理</option>
+            <option value="">榛樿鍔╃悊</option>
             {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
@@ -169,7 +186,8 @@ export function Sidebar(p: Props) {
       </details>
 
       <div className="sidebar-section sessions-section">
-        <label className="field-label">任务 ({sessions.length || fallbackTasks.length})</label>
+        <label className="field-label">会话 ({sessions.length || fallbackTasks.length})</label>
+        <input className="field session-search" value={sessionQuery} onChange={e => setSessionQuery(e.target.value)} placeholder="搜索会话" />
         <div className="session-list">
           {sessions.length === 0 && fallbackTasks.map(task => (
             <div key={task.title} className="session-row placeholder-task">
@@ -180,22 +198,32 @@ export function Sidebar(p: Props) {
               </div>
             </div>
           ))}
-          {sessions.map(s => (
-            <div key={s.sessionId}
-              className={`session-row ${s.sessionId === p.currentSessionId ? 'active' : ''}`}
-              onClick={() => p.onLoadSession(s.sessionId)}
-              title={`${s.title ?? ''}\n${new Date(s.updatedAt).toLocaleString()}`}>
-              <div className="session-title">{s.title ?? '(未命名)'}</div>
-              <div className="session-meta">
-                <span>{s.messageCount} 条</span>
-                <button className="link-btn"
-                  onClick={e => {
-                    e.stopPropagation()
-                    deleteSession(s.sessionId).then(() => listSessions().then(setSessions))
-                  }}>删除</button>
+          {sessions.map(s => {
+            const displayTitle = displaySessionTitle(s)
+            const rawTitle = s.title?.trim()
+            const repaired = Boolean(rawTitle) && rawTitle !== displayTitle
+            return (
+              <div key={s.sessionId}
+                className={`session-row ${s.sessionId === p.currentSessionId ? 'active' : ''}`}
+                onClick={() => p.onLoadSession(s.sessionId)}
+                title={`${displayTitle}${repaired ? `\n原始标题：${rawTitle}` : ''}\n${new Date(s.updatedAt).toLocaleString()}`}>
+                <div className="session-title">{displayTitle}</div>
+                <div className="session-meta">
+                  <span>{s.messageCount} 条</span>
+                  <button className="link-btn"
+                    onClick={e => {
+                      e.stopPropagation()
+                      void renameSession(s.sessionId, s.title)
+                    }}>重命名</button>
+                  <button className="link-btn"
+                    onClick={e => {
+                      e.stopPropagation()
+                      void removeSession(s.sessionId)
+                    }}>删除</button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -216,4 +244,28 @@ export function Sidebar(p: Props) {
       )}
     </aside>
   )
+
+function displaySessionTitle(session: SessionSummaryDto): string {
+  const title = sanitizeSessionTitle(session.title)
+  if (title) return title
+
+  const updatedAt = new Date(session.updatedAt)
+  const time = Number.isNaN(updatedAt.getTime())
+    ? '未命名'
+    : updatedAt.toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return `历史会话 · ${time}`
+}
+
+function sanitizeSessionTitle(title?: string | null): string | null {
+  const value = title?.trim()
+  if (!value) return null
+
+  const compact = value.replace(/\s/g, '')
+  const questionCount = compact.split('').filter(ch => ch === '?').length
+  const readableCount = (compact.match(/[A-Za-z0-9\u4e00-\u9fff]/g) ?? []).length - questionCount
+  const questionRatio = compact.length > 0 ? questionCount / compact.length : 0
+
+  if (questionCount >= 2 && (compact.length <= 4 || questionRatio >= 0.45 || readableCount <= 2)) return null
+  return value
+}
 }

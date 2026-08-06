@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using QianYuan.Core.Abstractions;
 using QianYuan.Core.Models;
@@ -64,7 +65,8 @@ public sealed class ReActAgent : IAgent
                 ProgressiveTopK = _def.ProgressiveTopK,
                 ExposeAgentsAsTools = _def.ExposeAgentsAsTools,
                 LoopEngineering = _def.LoopEngineering,
-            });
+            },
+            _services.GetService<ITokenCounter>());
 
         // Build per-turn dispatcher with a tool-name -> skill-id resolver from the engine's live map.
         // We use a closure over a shared dictionary updated by the engine through CollectToolsAsync.

@@ -1,0 +1,262 @@
+﻿QianYuan 乾元框架 — 多轮对话功能实施规划
+目标：实现对话连贯性与稳定性 · 参考 WorkBuddy 功能描述文档 · 3 阶段 / 4-6 周
+⚠️ 保密声明：本项目严格保密，所有文件保存在本地，禁止上传云端。专家提示词需本地化，不得依赖远程 URL。
+一、现状分析
+1.1 对话基础设施现状
+已有能力：
+ChatMessage 模型：完整的多模态消息结构，支持 Text / Image / Audio / File / ToolCall / ToolResult 六种内容类型
+ISessionStore 抽象：定义了 Get / Save / Delete / List 四个方法
+InMemorySessionStore：基于内存 Dictionary 的实现（纯内存，重启全丢）
+ChatController：SSE 流式端点，加载会话状态 → 追加用户消息 → 执行 ReAct 循环 → 保存会话状态
+ReActEngine + LoopEngineering：完整的 ReAct 循环，字符截断式上下文压缩
+前端 useChat hook：SSE 解析、流式显示、工具调用/观察/思考分别渲染
+1.2 关键问题诊断
+问题 1：会话不持久化InMemorySessionStore 是纯内存实现，应用重启后所有对话历史丢失。数据库中无 Conversation / Message 实体表。
+问题 2：消息历史不完整ChatController 只保存最终 assistant 文本，工具调用参数、观察结果、思考过程全部丢失。
+问题 3：ChatHub 与 SessionStore 脱节ChatHub.Send 直接用单条用户消息构造 AgentRunRequest，完全不调用 ISessionStore。
+问题 4：上下文压缩过于简单按字符数截断，无 token 计数、无语义摘要、无重要消息保留策略。长对话后期上下文严重丢失。
+问题 5：无多会话管理前端只有单个 sessionId 状态，无会话列表侧边栏、无搜索/重命名/删除功能、无会话恢复。
+问题 6：无对话检索与记忆系统WorkBuddy 有 conversation_search 工具和三层记忆系统，QianYuan 完全没有这些能力。
+问题 7：无 SSE 断线恢复流式输出中途断连后，会话状态不一致，前端无法恢复中断的流式输出。
+二、差距分析
+对比 WorkBuddy 功能描述文档：
+功能维度
+WorkBuddy（目标）
+QianYuan（现状）
+差距
+会话持久化
+服务器端 SQLite 数据库存储
+纯内存 Dictionary，重启全丢
+严重
+消息历史完整性
+完整保存文本 + 工具调用 + 观察结果
+仅保存最终 assistant 文本
+严重
+多会话管理
+会话列表、切换、搜索、重命名、删除
+单会话，刷新即丢
+严重
+上下文管理
+对话历史自动保留，子代理减少 token
+字符截断式压缩，无 token 计数
+中等
+对话检索
+conversation_search 工具，服务器端排序
+无
+中等
+记忆系统
+三层：云画像 / 用户级 / 工作空间
+无
+中等
+SignalR 集成
+不适用（用 SSE）
+ChatHub 不使用 ISessionStore
+中等
+SSE 断线恢复
+流式中断后可恢复
+无恢复机制
+次要
+消息编辑/重生成
+支持编辑用户消息、重新生成回复
+不支持
+次要
+会话导出
+通过 present_files 导出
+不支持
+次要
+三、三阶段实施计划
+● 第1阶段
+会话持久化与完整消息存储
+预计 2 周 · 8 项任务 · 优先级：最高
+目标：将会话从内存迁移到数据库，实现完整的消息历史持久化（含工具调用、观察结果、思考过程），确保应用重启后对话不丢失，为多轮对话连贯性奠定数据基础。
+1. 新建会话与消息数据实体
+在 QianYuan.Data/Entities 下新建 Conversation、ConversationMessage、ConversationTurn 实体。Conversation 含 Id/UserId/Title/AgentId/CreatedAt/UpdatedAt/Status；ConversationMessage 含 Id/ConversationId/Role/Content(JSON)/SortOrder/CreatedAt；ConversationTurn 含 Id/ConversationId/UserMessageId/AssistantMessageId/TokensUsed
+2. 扩展 QianYuanDbContext 并创建迁移
+添加 Conversations、ConversationMessages、ConversationTurns 三个 DbSet，配置索引和外键关系，生成 EF Core Migration
+3. 实现 EfSessionStore 替换 InMemorySessionStore
+将 SessionState 映射到 Conversation + ConversationMessage 表。Get 时加载完整消息列表（含工具调用 ContentPart），Save 时持久化所有消息
+4. 修复 ChatController 消息保存逻辑
+不再只保存 assistantText，而是保存完整的 assistant 消息（含 ToolCall ContentPart）。工具调用结果和观察结果也作为 Tool 角色消息持久化
+5. 修复 ChatHub 会话集成
+ChatHub.Send 方法增加 ISessionStore 注入，像 ChatController 一样加载会话历史、追加用户消息、执行后保存
+6. 新增会话管理 API 端点
+扩展 SessionsController：GET /api/sessions（列表）、GET /api/sessions/{id}（详情）、POST /api/sessions（新建）、PUT /api/sessions/{id}（重命名）、DELETE /api/sessions/{id}（删除）
+7. 前端会话列表侧边栏
+在 Sidebar 组件添加会话列表区域：展示最近会话、点击切换、新建按钮、重命名/删除操作。刷新页面后自动恢复最近会话
+8. 前端会话恢复与历史消息渲染
+useChat hook 增加 loadSession 方法，切换会话时从 API 加载历史消息并渲染（包括工具调用、观察结果、思考过程的回填）
+验收标准：
+应用重启后，历史对话完整恢复（含工具调用和观察结果）
+会话列表可浏览、搜索、切换、重命名、删除
+多轮对话中后续轮次能看到之前所有工具调用和结果
+ChatHub（SignalR）通道与 SSE 端点行为一致
+● 第2阶段
+上下文管理与对话连贯性
+预计 2 周 · 7 项任务 · 优先级：高
+目标：将字符截断式上下文压缩升级为 token 感知 + 语义摘要的智能上下文管理，实现 SSE 断线恢复和错误恢复机制，确保长对话的连贯性和稳定性。
+1. 实现 Token 计数器
+新建 ITokenCounter 接口，基于 tiktoken 等库实现准确的 token 计数（而非字符数估算）。支持不同模型的 tokenizer（Claude / GPT / Gemini）
+2. 智能上下文压缩：滑动窗口 + 摘要
+替换 LoopEngineering 的压缩逻辑：保留最近 N 轮完整消息，对更早的消息调用 LLM 生成语义摘要（而非一行截断）。摘要缓存在 Conversation 实体中，避免重复生成
+3. 上下文窗口配置化
+为不同模型配置不同的上下文窗口大小（Claude 200K / GPT-4 128K / Gemini 1M）。根据当前使用的模型动态调整压缩阈值
+4. SSE 断线恢复机制
+ChatController 的 Stream 方法增加 lastEventId 参数支持。客户端断线重连时传入最后收到的 event id，服务端从该点继续输出
+5. 会话状态原子性保护
+EfSessionStore.SaveAsync 使用数据库事务，确保用户消息 + assistant 消息 + 工具消息要么全部保存要么全部回滚。ReAct 异常时保存已完成的中间结果
+6. 消息编辑与重新生成
+前端支持编辑已发送的用户消息，编辑后截断后续消息并重新生成。后端新增 regenerate 端点，保留被截断的消息作为历史分支
+7. 前端流式中断恢复 UI
+useChat hook 检测到流式中断时，显示“回复中断，点击恢复”提示。点击后通过 lastEventId 恢复流式输出
+验收标准：
+长对话（50+ 轮）后期仍保持上下文连贯，模型能引用早期信息
+上下文压缩基于 token 计数，不同模型使用不同窗口大小
+流式输出中途断连后可恢复，不丢失已有内容
+ReAct 异常时会话状态一致，不出现半保存状态
+支持编辑用户消息并重新生成回复
+● 第3阶段
+记忆系统与对话检索
+预计 2 周 · 6 项任务 · 优先级：中
+目标：参照 WorkBuddy 三层记忆系统，实现跨会话上下文保持能力。提供对话检索工具，使模型能主动查找历史对话中的关键信息。
+1. 工作空间记忆系统
+参照 WorkBuddy Layer 3：在项目工作空间下创建 .qianyuan/memory/ 目录，含 YYYY-MM-DD.md（每日工作日志，只追加）和 MEMORY.md（长期项目笔记）。30 天以上日志蒸馏到 MEMORY.md
+2. 用户级记忆系统
+参照 WorkBuddy Layer 2：在用户主目录下创建 ~/.qianyuan/MEMORY.md，跨项目共享。限制 4000 字符/会话写入量
+3. 记忆注入机制
+会话开始时自动读取工作空间 MEMORY.md + 用户级 MEMORY.md，注入到系统提示词中。ReActEngine 在构造系统提示时合并记忆内容
+4. 对话检索工具（conversation_search）
+实现 conversation_search 技能工具：参数含 query / start_date / end_date / limit。搜索 Conversation + ConversationMessage 表，基于关键词匹配 + 时间排序返回相关历史对话片段
+5. 记忆写入工具
+实现记忆写入能力：完成实质性工作后自动追加日志，用户分享项目约定时更新 MEMORY.md
+6. 会话导出功能
+新增 GET /api/sessions/{id}/export 端点，将会话导出为 Markdown / JSON 格式。前端会话详情页增加“导出”按钮
+验收标准：
+新会话开始时自动注入工作空间和用户级记忆
+完成工作后自动追加日志到每日记忆文件
+conversation_search 工具能搜索历史对话并返回相关片段
+跨会话的项目约定和偏好能被模型记住和应用
+支持将会话导出为 Markdown / JSON
+四、数据模型变更
+4.1 新增实体
+实体名
+关键字段
+说明
+Conversation
+Id, UserId, Title, AgentId, Status, CreatedAt, UpdatedAt, Summary
+一个用户的对话会话
+ConversationMessage
+Id, ConversationId, Role, Content(JSON), SortOrder, CreatedAt, Tokens, IsDeleted
+单条消息（含多模态内容）
+ConversationTurn
+Id, ConversationId, UserMessageId, AssistantMessageId, InputTokens, OutputTokens
+一轮对话（用户消息→助手回复）
+4.2 ISessionStore 实现替换
+当前
+目标
+变更说明
+InMemorySessionStore（Dictionary 内存存储）
+EfSessionStore（EF Core 数据库存储）
+实现相同的 ISessionStore 接口，内部映射到 Conversation + ConversationMessage 表。DI 注册从 Singleton 改为 Scoped
+4.3 LoopEngineering 配置变更
+配置项
+当前值
+目标值
+MaxTranscriptCharacters
+80,000（字符数）
+废弃，改用 MaxContextTokens（按模型动态配置）
+MinRecentMessagesToKeep
+12
+改为 MinRecentTurnsToKeep（按轮次而非消息条数）
+压缩策略
+截断为一行摘要
+LLM 语义摘要 + 重要消息保留 + 摘要缓存
+五、API 变更清单
+5.1 新增端点
+方法
+路径
+说明
+阶段
+GET
+/api/sessions
+会话列表（分页、搜索）
+阶段 1
+GET
+/api/sessions/{id}
+会话详情（含完整消息）
+阶段 1
+POST
+/api/sessions
+新建空会话
+阶段 1
+PUT
+/api/sessions/{id}
+更新会话（重命名等）
+阶段 1
+DELETE
+/api/sessions/{id}
+删除会话（软删除）
+阶段 1
+POST
+/api/sessions/{id}/regenerate
+从指定消息重新生成
+阶段 2
+GET
+/api/sessions/{id}/export
+导出会话（Markdown/JSON）
+阶段 3
+5.2 修改端点
+方法
+路径
+变更内容
+阶段
+POST
+/api/chat/stream
+增加 lastEventId 参数（断线恢复）；保存完整消息
+阶段 1+2
+SignalR
+ChatHub.Send
+注入 ISessionStore，加载/保存会话历史
+阶段 1
+5.3 新增技能工具
+工具名
+参数
+说明
+阶段
+conversation_search
+query, start_date, end_date, limit
+搜索历史对话
+阶段 3
+memory_write
+scope, content
+写入记忆文件
+阶段 3
+memory_read
+scope
+读取记忆文件
+阶段 3
+六、里程碑与风险
+6.1 里程碑
+时间
+里程碑
+交付物
+第 2 周
+阶段 1 完成 — 会话持久化上线
+应用重启后对话不丢失，会话列表可管理，完整消息历史持久化
+第 4 周
+阶段 2 完成 — 上下文管理与连贯性
+智能上下文压缩、SSE 断线恢复、消息编辑重生成
+第 6 周
+阶段 3 完成 — 记忆系统与对话检索
+三层记忆系统、conversation_search 工具、会话导出
+6.2 风险与对策
+风险 1：数据库迁移影响现有数据 [严重]
+新增三张表需要数据库迁移。现有用户数据不受影响，但需确保迁移脚本在 SQLite 和 PostgreSQL 上都能正确执行。对策：迁移脚本先在开发环境完整测试；新增表不修改现有表结构；提供回滚脚本。
+风险 2：Token 计数性能影响 [中等]
+每次消息保存时计算 token 数可能增加延迟。对策：token 计数异步执行；缓存 tokenizer 实例避免重复初始化。
+风险 3：LLM 语义摘要增加成本 [中等]
+上下文压缩从截断改为 LLM 摘要，每次压缩需要额外的 LLM 调用。对策：摘要结果缓存在 Conversation.Summary 中，只在新增消息超阈值时重新生成；使用低成本模型生成摘要。
+风险 4：记忆文件并发写入冲突 [次要]
+多个会话同时写入同一个 MEMORY.md 文件可能冲突。对策：使用文件锁或队列化写入；记忆写入是异步操作。
+风险 5：SSE 断线恢复的边界情况 [次要]
+服务端重启后无法恢复中断的流式输出。对策：streaming 状态持久化到数据库；服务重启后检测中断的会话，标记为“需手动恢复”。
+QianYuan 乾元 Agentic Framework · 多轮对话功能实施规划 · 严格保密参考文档：WorkBuddy 功能描述说明 · 生成日期：2026-08-02
