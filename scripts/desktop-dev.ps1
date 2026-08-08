@@ -34,8 +34,30 @@ function Test-Url($url) {
 if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
     Fail 'npm not found. Install Node.js >=18.'
 }
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Fail 'node not found. Install Node.js >=18.'
+}
+
+$nodeVer = (node --version).Trim()
+$nodeMajor = 0
+$normalizedNodeVer = $nodeVer -replace '^[vV]', ''
+if (-not [int]::TryParse($normalizedNodeVer.Split('.')[0], [ref]$nodeMajor)) {
+    Fail "Unable to parse Node.js version: $nodeVer"
+}
+if ($nodeMajor -lt 18) {
+    Fail "Node.js $nodeVer detected. WorkPartner Desktop requires Node.js >=18."
+}
+
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     Fail 'dotnet not found. Install .NET 10 SDK.'
+}
+$dotnetVer = (dotnet --version).Trim()
+$dotnetMajor = 0
+if (-not [int]::TryParse($dotnetVer.Split('.')[0], [ref]$dotnetMajor)) {
+    Fail "Unable to parse dotnet version: $dotnetVer"
+}
+if ($dotnetMajor -lt 10) {
+    Fail ".NET SDK $dotnetVer detected. WorkPartner Desktop requires .NET SDK >= 10.0.100."
 }
 
 if (-not (Test-Path (Join-Path $webDir 'node_modules'))) {

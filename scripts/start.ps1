@@ -6,14 +6,21 @@
   Api host and the React dev server in new windows. Logs go to .runtime\logs.
 .PARAMETER Stop
   Kill running Api / Web processes recorded in .runtime\*.pid and exit.
+.PARAMETER InstallDeps
+    Force npm dependency installation for Web and Desktop projects before startup.
+.PARAMETER InstallDepsOnly
+    Install npm dependencies for Web and Desktop projects, then exit.
 .EXAMPLE
   pwsh -File scripts\start.ps1
   pwsh -File scripts\start.ps1 -Stop
+    pwsh -File scripts\start.ps1 -InstallDepsOnly
 #>
 
 [CmdletBinding()]
 param(
-    [switch]$Stop
+        [switch]$Stop,
+        [switch]$InstallDeps,
+        [switch]$InstallDepsOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,6 +32,7 @@ $webPidFile  = Join-Path $runtimeDir 'web.pid'
 $solutionFile = Join-Path $root 'QianYuan.AgenticFramework.sln'
 $apiProject  = Join-Path $root 'src\QianYuan.Api\QianYuan.Api.csproj'
 $webDir      = Join-Path $root 'src\QianYuan.Web'
+$desktopDir  = Join-Path $root 'src\QianYuan.Desktop'
 $apiUrl      = if ($env:QIANYUAN_API_URL) { $env:QIANYUAN_API_URL } else { 'http://localhost:5050' }
 $webUrl      = if ($env:QIANYUAN_WEB_URL) { $env:QIANYUAN_WEB_URL } else { 'http://localhost:5173' }
 
@@ -47,6 +55,25 @@ function Stop-PidFile($file, $name) {
     }
 }
 
+function Install-NpmDependencies($projectDir, $projectName, $logFile, $forceInstall) {
+    $nodeModulesPath = Join-Path $projectDir 'node_modules'
+    if (-not $forceInstall -and (Test-Path $nodeModulesPath)) {
+        Ok "$projectName dependencies already installed"
+        return
+    }
+
+    Info "npm install ($projectName)"
+    Push-Location $projectDir
+    try { & npm install *>$logFile }
+    finally { Pop-Location }
+
+    if ($LASTEXITCODE -ne 0) {
+        Get-Content $logFile -Tail 80
+        Fail "npm install failed for $projectName (see $logFile)"
+    }
+    Ok "$projectName dependencies installed"
+}
+
 New-Item -ItemType Directory -Force -Path $runtimeDir, $logDir | Out-Null
 
 if ($Stop) {
@@ -61,8 +88,13 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     Fail 'dotnet not found. Install .NET 10 SDK from https://dotnet.microsoft.com/download'
 }
 $dotnetVer = (dotnet --version).Trim()
-$major     = [int]($dotnetVer.Split('.')[0])
-if ($major -lt 10) { Warn ".NET SDK $dotnetVer detected — this repo targets net10.0. Continuing." }
+$dotnetMajor = 0
+if (-not [int]::TryParse($dotnetVer.Split('.')[0], [ref]$dotnetMajor)) {
+    Fail "Unable to parse dotnet version: $dotnetVer"
+}
+if ($dotnetMajor -lt 10) {
+    Fail ".NET SDK $dotnetVer detected. This repo requires .NET SDK >= 10.0.100 (target framework: net10.0)."
+}
 Ok ".NET SDK $dotnetVer"
 
 $startWeb = $true
@@ -70,7 +102,34 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
     Warn 'npm not found — skipping WebUI. Install Node.js >=18 to enable it.'
     $startWeb = $false
 } else {
-    Ok "Node $(node --version)  npm $(npm --version)"
+    $nodeVer = (node --version).Trim()
+    $nodeMajor = 0
+    $normalizedNodeVer = $nodeVer -replace '^[vV]', ''
+    if (-not [int]::TryParse($normalizedNodeVer.Split('.')[0], [ref]$nodeMajor)) {
+        Warn "Unable to parse Node.js version ($nodeVer) — skipping WebUI. Requires Node.js >=18."
+        $startWeb = $false
+    }
+    elseif ($nodeMajor -lt 18) {
+        Warn "Node.js $nodeVer detected — skipping WebUI. Requires Node.js >=18."
+        $startWeb = $false
+    }
+
+    if ($startWeb) {
+        Ok "Node $nodeVer  npm $(npm --version)"
+    }
+}
+
+if ($startWeb) {
+    Install-NpmDependencies -projectDir $webDir -projectName 'QianYuan.Web' -logFile (Join-Path $logDir 'npm-install-web.log') -forceInstall ($InstallDeps -or $InstallDepsOnly)
+    if (Test-Path $desktopDir) {
+        Install-NpmDependencies -projectDir $desktopDir -projectName 'QianYuan.Desktop' -logFile (Join-Path $logDir 'npm-install-desktop.log') -forceInstall ($InstallDeps -or $InstallDepsOnly)
+    }
+}
+
+if ($InstallDepsOnly) {
+    Ok 'Dependency installation completed (InstallDepsOnly).'
+    "  Logs   : $logDir"
+    exit 0
 }
 
 # --- Clean up stale processes ---
@@ -88,16 +147,6 @@ $buildLog = Join-Path $logDir 'build.log'
 & dotnet build $solutionFile -c Release --nologo --no-restore *>$buildLog
 if ($LASTEXITCODE -ne 0) { Get-Content $buildLog -Tail 80; Fail "build failed (see $buildLog)" }
 Ok 'build succeeded'
-
-# --- npm install if needed ---
-if ($startWeb -and -not (Test-Path (Join-Path $webDir 'node_modules'))) {
-    Info "npm install ($webDir)"
-    $npmLog = Join-Path $logDir 'npm-install.log'
-    Push-Location $webDir
-    try { & npm install --silent *>$npmLog }
-    finally { Pop-Location }
-    if ($LASTEXITCODE -ne 0) { Get-Content $npmLog -Tail 60; Fail 'npm install failed' }
-}
 
 # --- Start Api ---
 Info "Starting Api -> $apiUrl  (logs: $logDir\api.log)"
