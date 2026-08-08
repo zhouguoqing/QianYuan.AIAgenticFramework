@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using QianYuan.Core.Abstractions;
@@ -18,6 +18,7 @@ public sealed class ChatController : ControllerBase
     private readonly ILlmProviderRegistry _providers;
     private readonly ISessionStore _sessions;
     private readonly IAgentRepository _agentRepository;
+    private readonly IMemoryService _memory;
     private readonly ILogger<ChatController> _logger;
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
@@ -27,12 +28,14 @@ public sealed class ChatController : ControllerBase
         ILlmProviderRegistry providers,
         ISessionStore sessions,
         IAgentRepository agentRepository,
+        IMemoryService memory,
         ILogger<ChatController> logger)
     {
         _agents = agents;
         _providers = providers;
         _sessions = sessions;
         _agentRepository = agentRepository;
+        _memory = memory;
         _logger = logger;
     }
 
@@ -83,6 +86,10 @@ public sealed class ChatController : ControllerBase
         state.Title ??= req.UserText is { Length: > 0 } ? Snippet(req.UserText, 40) : null;
         state.AgentId = agent.Id;
 
+        var memoryContext = new MemoryContext(req.WorkspacePath, req.WorkspaceLabel, req.OwnerId, sessionId);
+        var memorySnapshot = await _memory.ReadAsync(memoryContext, ct).ConfigureAwait(false);
+        var memoryPrompt = BuildMemoryPrompt(memorySnapshot);
+
         var transcript = new StreamTranscriptBuilder();
         await WriteSse("session", new { sessionId, agentId = agent.Id }, ct);
 
@@ -108,7 +115,7 @@ public sealed class ChatController : ControllerBase
             SessionId = sessionId,
             ModelOverride = modelOverride,
             ProviderOverride = providerOverride,
-            SystemPromptOverride = BuildSystemPromptOverride(storeAgent, req.SystemPrompt),
+            SystemPromptOverride = BuildSystemPromptOverride(storeAgent, req.SystemPrompt, memoryPrompt),
             PreloadSkills = BuildPreloadSkills(storeAgent, req.Skills),
             MaxIterations = req.MaxIterations,
             Metadata = BuildMetadata(req, resolvedProvider.ProviderId, modelOverride ?? resolvedProvider.DefaultModel),
@@ -135,22 +142,58 @@ public sealed class ChatController : ControllerBase
             await WriteSse("error", new { message = ex.Message }, HttpContext.RequestAborted).ConfigureAwait(false);
         }
 
-        state.Messages.AddRange(transcript.Complete());
+        var generatedMessages = transcript.Complete();
+        state.Messages.AddRange(generatedMessages);
         await _sessions.SaveAsync(state, streamInterrupted ? CancellationToken.None : ct).ConfigureAwait(false);
+
+        try
+        {
+            var userLogText = req.ReuseLastUserMessage
+                ? messages.LastOrDefault(m => m.Role == ChatRole.User)?.AsPlainText()
+                : req.UserText;
+            await _memory.AppendDailyLogAsync(memoryContext, state.Title ?? sessionId, userLogText, ExtractAssistantText(generatedMessages), CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to append QIANYUAN memory log for session {SessionId}", sessionId);
+        }
 
         if (!streamInterrupted)
             await WriteSse("done", new { sessionId }, ct).ConfigureAwait(false);
     }
 
 
-    private static string? BuildSystemPromptOverride(Agent? storeAgent, string? expertPrompt)
+    private static string? BuildSystemPromptOverride(Agent? storeAgent, string? expertPrompt, string? memoryPrompt)
     {
-        var parts = new[] { storeAgent?.SystemPrompt, expertPrompt }
+        var parts = new[] { storeAgent?.SystemPrompt, expertPrompt, memoryPrompt }
             .Where(p => !string.IsNullOrWhiteSpace(p))
             .Select(p => p!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         return parts.Length == 0 ? null : string.Join("\n\n", parts);
+    }
+
+
+    private static string? BuildMemoryPrompt(MemorySnapshot snapshot)
+    {
+        var sections = new List<string>();
+        if (!string.IsNullOrWhiteSpace(snapshot.UserMemory))
+            sections.Add($"用户级长期记忆：\n{snapshot.UserMemory!.Trim()}");
+        if (!string.IsNullOrWhiteSpace(snapshot.WorkspaceMemory))
+            sections.Add($"工作空间长期记忆：\n{snapshot.WorkspaceMemory!.Trim()}");
+
+        return sections.Count == 0
+            ? null
+            : "以下是 QIANYUAN 本地记忆，仅用于保持跨会话上下文。不要向用户泄露记忆文件路径，除非用户询问。\n\n" + string.Join("\n\n", sections);
+    }
+
+    private static string? ExtractAssistantText(IEnumerable<ChatMessage> messages)
+    {
+        var text = string.Join("\n", messages
+            .Where(m => m.Role == ChatRole.Assistant)
+            .Select(m => m.AsPlainText())
+            .Where(t => !string.IsNullOrWhiteSpace(t)));
+        return string.IsNullOrWhiteSpace(text) ? null : Snippet(text, 2000);
     }
 
     private static string[]? BuildPreloadSkills(Agent? storeAgent, string[]? requestSkills)
@@ -165,6 +208,7 @@ public sealed class ChatController : ControllerBase
                 .Select(s => s.SkillId));
         }
 
+        if (skills.Count > 0) skills.Insert(0, "qianyuan.memory");
         var distinct = skills.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         return distinct.Length == 0 ? null : distinct;
     }

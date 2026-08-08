@@ -22,6 +22,7 @@ $runtimeDir  = Join-Path $root '.runtime'
 $logDir      = Join-Path $runtimeDir 'logs'
 $apiPidFile  = Join-Path $runtimeDir 'api.pid'
 $webPidFile  = Join-Path $runtimeDir 'web.pid'
+$solutionFile = Join-Path $root 'QianYuan.AgenticFramework.sln'
 $apiProject  = Join-Path $root 'src\QianYuan.Api\QianYuan.Api.csproj'
 $webDir      = Join-Path $root 'src\QianYuan.Web'
 $apiUrl      = if ($env:QIANYUAN_API_URL) { $env:QIANYUAN_API_URL } else { 'http://localhost:5050' }
@@ -79,12 +80,12 @@ Stop-PidFile $webPidFile 'Web (stale)'
 # --- Build ---
 Info 'dotnet restore'
 $restoreLog = Join-Path $logDir 'restore.log'
-& dotnet restore --nologo *>$restoreLog
+& dotnet restore $solutionFile --nologo *>$restoreLog
 if ($LASTEXITCODE -ne 0) { Get-Content $restoreLog -Tail 60; Fail "restore failed (see $restoreLog)" }
 
 Info 'dotnet build (Release)'
 $buildLog = Join-Path $logDir 'build.log'
-& dotnet build -c Release --nologo --no-restore *>$buildLog
+& dotnet build $solutionFile -c Release --nologo --no-restore *>$buildLog
 if ($LASTEXITCODE -ne 0) { Get-Content $buildLog -Tail 80; Fail "build failed (see $buildLog)" }
 Ok 'build succeeded'
 

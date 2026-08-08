@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ChunkDto, StreamRequest, ImageGenerationRequest, ImageGenerationResponse,
   AgentDto, SkillManifestDto, SkillToolsResponse, McpStdioRegistrationRequest,
   SkillCategoryDto, SkillPackageDto, SkillMarketEntryDto, InstalledSkillDto,
@@ -396,6 +396,26 @@ export async function prepareRegenerateSession(id: string, req: SessionRegenerat
   return readJsonOrThrow(await fetch(`${API}/sessions/${encodeURIComponent(id)}/regenerate`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req),
   }))
+}
+
+export async function exportSession(id: string, format: 'markdown' | 'json' = 'markdown'): Promise<{ blob: Blob; filename: string }> {
+  const r = await fetch(`${API}/sessions/${encodeURIComponent(id)}/export?format=${encodeURIComponent(format)}`)
+  if (!r.ok) throw new Error(await r.text())
+  const blob = await r.blob()
+  const disposition = r.headers.get('content-disposition') ?? ''
+  const filename = parseContentDispositionFilename(disposition) ?? `session-${id}.${format === 'json' ? 'json' : 'md'}`
+  return { blob, filename }
+}
+
+function parseContentDispositionFilename(value: string): string | null {
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(value)
+  if (utf8?.[1]) return decodeURIComponent(utf8[1].replace(/"/g, ''))
+  const ascii = /filename="?([^";]+)"?/i.exec(value)
+  return ascii?.[1] ?? null
+}
+
+export async function clearSessions(): Promise<{ deleted: number }> {
+  return readJsonOrThrow(await fetch(`${API}/sessions/clear`, { method: 'POST' }))
 }
 
 export async function deleteSession(id: string) {

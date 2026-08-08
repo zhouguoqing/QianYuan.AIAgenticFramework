@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using QianYuan.Core.Abstractions;
@@ -75,6 +75,7 @@ public static class QianYuanKernelExtensions
 internal sealed class InMemorySessionStore : ISessionStore
 {
     private readonly Dictionary<string, SessionState> _store = new();
+    private readonly HashSet<string> _deleted = new(StringComparer.Ordinal);
     private readonly Lock _gate = new();
 
     public ValueTask<SessionState?> GetAsync(string sessionId, CancellationToken ct = default)
@@ -86,14 +87,39 @@ internal sealed class InMemorySessionStore : ISessionStore
     public ValueTask SaveAsync(SessionState state, CancellationToken ct = default)
     {
         state.UpdatedAt = DateTimeOffset.UtcNow;
-        lock (_gate) _store[state.SessionId] = state;
+        lock (_gate)
+        {
+            if (_deleted.Contains(state.SessionId)) return ValueTask.CompletedTask;
+            _store[state.SessionId] = state;
+        }
         return ValueTask.CompletedTask;
     }
 
     public ValueTask DeleteAsync(string sessionId, CancellationToken ct = default)
     {
-        lock (_gate) _store.Remove(sessionId);
+        lock (_gate)
+        {
+            _store.Remove(sessionId);
+            _deleted.Add(sessionId);
+        }
         return ValueTask.CompletedTask;
+    }
+
+    public ValueTask<int> ClearAsync(string? ownerId = null, CancellationToken ct = default)
+    {
+        lock (_gate)
+        {
+            var ids = _store.Values
+                .Where(s => ownerId is null || s.OwnerId == ownerId)
+                .Select(s => s.SessionId)
+                .ToArray();
+            foreach (var id in ids)
+            {
+                _store.Remove(id);
+                _deleted.Add(id);
+            }
+            return ValueTask.FromResult(ids.Length);
+        }
     }
 
     public ValueTask<IReadOnlyList<SessionSummary>> ListAsync(string? ownerId = null, int take = 50, CancellationToken ct = default)

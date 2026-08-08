@@ -54,6 +54,10 @@ public sealed class EfSessionStore : ISessionStore
             };
             _db.Conversations.Add(row);
         }
+        else if (string.Equals(row.Status, "Deleted", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
 
         row.UserId = state.OwnerId;
         row.Title = state.Title;
@@ -99,6 +103,20 @@ public sealed class EfSessionStore : ISessionStore
         row.Status = "Deleted";
         row.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    public async ValueTask<int> ClearAsync(string? ownerId = null, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var query = _db.Conversations.Where(c => c.Status != "Deleted");
+        if (!string.IsNullOrWhiteSpace(ownerId))
+            query = query.Where(c => c.UserId == ownerId);
+
+        return await query
+            .ExecuteUpdateAsync(updates => updates
+                .SetProperty(c => c.Status, "Deleted")
+                .SetProperty(c => c.UpdatedAt, now), ct)
+            .ConfigureAwait(false);
     }
 
     public async ValueTask<IReadOnlyList<SessionSummary>> ListAsync(string? ownerId = null, int take = 50, CancellationToken ct = default)

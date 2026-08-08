@@ -227,31 +227,92 @@ body {
 .hint-small { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
 .muted-small { font-size: 12px; color: var(--text-dim); padding: 4px 0; }
 
+.session-toolbar {
+  display: flex; align-items: center; gap: 8px; justify-content: space-between;
+}
+.session-clear-btn {
+  flex: none; padding: 3px 7px; font-size: 11px; line-height: 1.4;
+}
+
 .session-list {
   flex: 1; overflow-y: auto; margin-top: 6px;
   display: flex; flex-direction: column; gap: 2px;
   margin-right: -8px; padding-right: 6px;
 }
 .session-row {
-  padding: 7px 10px; border-radius: 6px; cursor: pointer;
+  position: relative;
+  padding: 7px 8px 7px 10px; border-radius: 8px; cursor: pointer;
   border: 1px solid transparent;
 }
 .session-row:hover { background: var(--bg-card); }
 .session-row.active { background: var(--bg-card); border-color: var(--border); }
+.session-row-main {
+  position: relative;
+}
+.session-copy { min-width: 0; transition: padding-right .12s ease; }
+.session-row:hover .session-copy,
+.session-row:focus-within .session-copy {
+  padding-right: 124px;
+}
+.session-subtitle {
+  margin-top: 2px; font-size: 11px; color: var(--text-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  pointer-events: none;
+}
+.session-actions {
+  position: absolute; z-index: 4; right: 0; top: 50%;
+  display: inline-flex; align-items: center; gap: 3px;
+  opacity: 0; pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity .12s ease;
+}
+.session-row:hover .session-actions,
+.session-row:focus-within .session-actions {
+  opacity: 1; pointer-events: auto;
+}
+.session-more-wrap { position: relative; display: inline-flex; }
+.session-icon-btn,
+.session-action-btn {
+  height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 6px; background: transparent;
+  color: var(--text-dim); line-height: 1;
+  cursor: pointer; white-space: nowrap;
+}
+.session-icon-btn { width: 22px; font-size: 14px; }
+.session-action-btn { padding: 0 6px; font-size: 11px; }
+.session-icon-btn:hover,
+.session-action-btn:hover { color: var(--text); background: rgba(77, 124, 255, 0.1); }
+.session-more-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 30;
+  min-width: 84px; padding: 4px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-card); box-shadow: var(--shadow);
+}
+.session-more-menu button {
+  width: 100%; display: block; text-align: left;
+  padding: 6px 8px; border: none; border-radius: 6px;
+  background: transparent; color: var(--text); font-size: 12px; cursor: pointer;
+}
+.session-more-menu button:hover { background: rgba(77, 124, 255, 0.1); }
 .session-title {
   font-size: 13px; color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  pointer-events: none;
 }
 .session-meta {
-  display: flex; gap: 8px; align-items: center;
+  position: relative; z-index: 2;
+  display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
   font-size: 11px; color: var(--text-dim); margin-top: 2px;
 }
 .session-meta span { flex: 1; }
 .link-btn {
+  position: relative; z-index: 3;
   background: none; border: none; color: var(--text-dim);
-  padding: 0; font-size: 11px; cursor: pointer;
+  padding: 2px 4px; margin: -2px 0; border-radius: 4px;
+  font-size: 11px; line-height: 1.4; cursor: pointer;
 }
-.link-btn:hover { color: var(--accent); }
+.link-btn:hover { color: var(--accent); background: rgba(77, 124, 255, 0.08); }
 
 /* legacy (used by other components) */
 .sidebar .row { padding: 6px 10px; border-radius: 6px; cursor: pointer; color: var(--text); }
@@ -660,6 +721,7 @@ body { background: var(--bg); color: var(--text); }
   min-height: 27px;
 }
 .session-row:hover, .session-row.active { background: #dededc; border-color: transparent; }
+.session-icon-btn:hover, .session-action-btn:hover, .session-more-menu button:hover { background: #eceeeb; }
 .session-title { color: #333638; font-size: 12px; }
 .session-meta { color: #a5a8aa; font-size: 11px; margin-top: 0; }
 .session-meta i {
@@ -670,7 +732,7 @@ body { background: var(--bg); color: var(--text); }
   display: block;
 }
 .placeholder-task { cursor: default; }
-.link-btn:hover { color: var(--accent); }
+.link-btn:hover { color: var(--accent); background: rgba(77, 124, 255, 0.08); }
 .sidebar-footer {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) 24px 24px;

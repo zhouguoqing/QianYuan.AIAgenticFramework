@@ -120,6 +120,18 @@ export default function App() {
     }
   }
 
+  function handleSessionsCleared() {
+    abort()
+    reset()
+    setSessionId(null)
+    setActiveExpert(null)
+    setComposerSeed(s => (s.text ? { text: '', nonce: s.nonce } : s))
+    setView('chat')
+    setShowTasks(false)
+    setShowCredits(false)
+    setSessionListVersion(v => v + 1)
+  }
+
   function loadSession(id: string) {
     abort()
     setActiveExpert(null)
@@ -188,6 +200,7 @@ export default function App() {
         onNewSession={startNewSession}
         onLoadSession={loadSession}
         sessionListVersion={sessionListVersion}
+        onSessionsCleared={handleSessionsCleared}
       />
       {view === 'agent-store' ? <AgentStore onBack={() => setView('chat')} />
         : view === 'experts' ? <ExpertMarketplace

@@ -1,3 +1,6 @@
+﻿using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using QianYuan.Api.Models;
@@ -276,12 +279,110 @@ public sealed class SessionsController : ControllerBase
         return Ok(state);
     }
 
+    [HttpGet("{id}/export")]
+    public async Task<IActionResult> Export(string id, [FromQuery] string format = "markdown", CancellationToken ct = default)
+    {
+        var state = await _store.GetAsync(id, ct);
+        if (state is null) return NotFound();
+
+        var normalized = string.Equals(format, "json", StringComparison.OrdinalIgnoreCase) ? "json" : "markdown";
+        var fileBase = SafeFileName(string.IsNullOrWhiteSpace(state.Title) ? state.SessionId : state.Title!);
+        if (normalized == "json")
+        {
+            var options = new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true };
+            options.Converters.Add(new JsonStringEnumConverter());
+            var json = JsonSerializer.Serialize(state, options);
+            return File(Encoding.UTF8.GetBytes(json), "application/json; charset=utf-8", $"{fileBase}.json");
+        }
+
+        var markdown = BuildSessionMarkdown(state);
+        return File(Encoding.UTF8.GetBytes(markdown), "text/markdown; charset=utf-8", $"{fileBase}.md");
+    }
+
+    [HttpPost("clear")]
+    public Task<IActionResult> ClearByPost([FromQuery] string? ownerId, CancellationToken ct) => ClearCore(ownerId, ct);
+
+    [HttpDelete]
+    public Task<IActionResult> Clear([FromQuery] string? ownerId, CancellationToken ct) => ClearCore(ownerId, ct);
+
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id, CancellationToken ct)
     {
         await _store.DeleteAsync(id, ct);
         return NoContent();
     }
+
+    private async Task<IActionResult> ClearCore(string? ownerId, CancellationToken ct)
+    {
+        var deleted = await _store.ClearAsync(ownerId, ct);
+        return Ok(new { deleted });
+    }
+
+    private static string BuildSessionMarkdown(SessionState state)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"# {EscapeMarkdown(string.IsNullOrWhiteSpace(state.Title) ? "未命名会话" : state.Title!)}");
+        sb.AppendLine();
+        sb.AppendLine($"- 会话 ID：`{state.SessionId}`");
+        if (!string.IsNullOrWhiteSpace(state.AgentId)) sb.AppendLine($"- Agent：`{state.AgentId}`");
+        sb.AppendLine($"- 创建时间：{state.CreatedAt:yyyy-MM-dd HH:mm:ss zzz}");
+        sb.AppendLine($"- 更新时间：{state.UpdatedAt:yyyy-MM-dd HH:mm:ss zzz}");
+        sb.AppendLine();
+
+        foreach (var message in state.Messages)
+        {
+            sb.AppendLine($"## {RoleLabel(message.Role)}");
+            sb.AppendLine();
+            foreach (var part in message.Parts)
+            {
+                switch (part.Kind)
+                {
+                    case ContentKind.Text:
+                        if (!string.IsNullOrWhiteSpace(part.Text)) sb.AppendLine(part.Text.Trim());
+                        break;
+                    case ContentKind.Image:
+                        sb.AppendLine($"![图片]({part.DataUrlOrBase64})");
+                        break;
+                    case ContentKind.ToolCall:
+                        sb.AppendLine($"工具调用：`{part.Name}`");
+                        sb.AppendLine("```json");
+                        sb.AppendLine(part.JsonPayload ?? "{}");
+                        sb.AppendLine("```");
+                        break;
+                    case ContentKind.ToolResult:
+                        sb.AppendLine("工具结果：");
+                        sb.AppendLine("```json");
+                        sb.AppendLine(part.JsonPayload ?? part.Text ?? string.Empty);
+                        sb.AppendLine("```");
+                        break;
+                    default:
+                        sb.AppendLine($"[{part.Kind}] {part.Text ?? part.DataUrlOrBase64 ?? part.JsonPayload}");
+                        break;
+                }
+                sb.AppendLine();
+            }
+        }
+        return sb.ToString();
+    }
+
+    private static string RoleLabel(ChatRole role) => role switch
+    {
+        ChatRole.User => "用户",
+        ChatRole.Assistant => "助手",
+        ChatRole.Tool => "工具",
+        ChatRole.System => "系统",
+        _ => role.ToString(),
+    };
+
+    private static string SafeFileName(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        var safe = new string(value.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray()).Trim();
+        if (string.IsNullOrWhiteSpace(safe)) safe = "session";
+        return safe.Length <= 80 ? safe : safe[..80];
+    }
+
+    private static string EscapeMarkdown(string value) => value.Replace("#", "\\#");
 
     private static string Snippet(string value, int maxLength) =>
         value.Length <= maxLength ? value : value[..maxLength] + "...";

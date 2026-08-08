@@ -1,4 +1,4 @@
-namespace QianYuan.Core.Memory;
+﻿namespace QianYuan.Core.Memory;
 
 /// <summary>
 /// Lightweight session/conversation memory abstraction.
@@ -9,6 +9,7 @@ public interface ISessionStore
     ValueTask<SessionState?> GetAsync(string sessionId, CancellationToken ct = default);
     ValueTask SaveAsync(SessionState state, CancellationToken ct = default);
     ValueTask DeleteAsync(string sessionId, CancellationToken ct = default);
+    ValueTask<int> ClearAsync(string? ownerId = null, CancellationToken ct = default);
     ValueTask<IReadOnlyList<SessionSummary>> ListAsync(string? ownerId = null, int take = 50, CancellationToken ct = default);
 }
 

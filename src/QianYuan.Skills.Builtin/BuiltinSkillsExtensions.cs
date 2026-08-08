@@ -1,7 +1,8 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using QianYuan.Core.Abstractions;
 using QianYuan.Skills.Builtin.Code;
 using QianYuan.Skills.Builtin.FileSystem;
+using QianYuan.Skills.Builtin.Memory;
 using QianYuan.Skills.Builtin.Vision;
 using QianYuan.Skills.Builtin.WebSearch;
 
@@ -75,6 +76,12 @@ public static class BuiltinSkillsExtensions
         return services;
     }
 
+
+    public static IServiceCollection AddConversationMemorySkill(this IServiceCollection services)
+    {
+        services.AddSingleton<ISkill, ConversationMemorySkill>();
+        return services;
+    }
     /// <summary>
     /// After building the DI container, register every <see cref="ISkill"/> resolved from DI
     /// into the <see cref="ISkillManager"/> so they show up in catalogs and progressive selection.

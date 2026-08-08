@@ -3,7 +3,7 @@ import type {
   AgentDto, ProviderDto, SkillManifestDto, SessionSummaryDto,
 } from '../types/api'
 import {
-  listAgents, listProviders, listSkills, listSessions, deleteSession, updateSession,
+  listAgents, listProviders, listSkills, listSessions, deleteSession, updateSession, exportSession, clearSessions,
 } from '../services/api'
 import { SkillsManager } from './SkillsManager'
 import { KnowledgeManager } from './KnowledgeManager'
@@ -25,6 +25,7 @@ interface Props {
   onNewSession: () => void | Promise<void>
   sessionListVersion?: number
   onLoadSession: (id: string) => void
+  onSessionsCleared?: () => void
 }
 
 export function Sidebar(p: Props) {
@@ -34,6 +35,7 @@ export function Sidebar(p: Props) {
   const [skills, setSkills] = useState<SkillManifestDto[]>([])
   const [sessions, setSessions] = useState<SessionSummaryDto[]>([])
   const [sessionQuery, setSessionQuery] = useState('')
+  const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(null)
   const [showSkillsManager, setShowSkillsManager] = useState(false)
   const [showKnowledgeManager, setShowKnowledgeManager] = useState(false)
 
@@ -58,6 +60,13 @@ export function Sidebar(p: Props) {
   useEffect(() => { reloadSessions() }, [sessionQuery])
 
   useEffect(() => { reloadSessions() }, [p.sessionListVersion])
+  useEffect(() => { setOpenSessionMenuId(null) }, [sessionQuery, p.sessionListVersion])
+  useEffect(() => {
+    if (!openSessionMenuId) return
+    const closeSessionMenu = () => setOpenSessionMenuId(null)
+    document.addEventListener('click', closeSessionMenu)
+    return () => document.removeEventListener('click', closeSessionMenu)
+  }, [openSessionMenuId])
 
   function toggleSkill(id: string) {
     p.onSkillsChange(p.selectedSkills.includes(id)
@@ -78,12 +87,41 @@ export function Sidebar(p: Props) {
     const next = window.prompt('重命名会话', sanitizeSessionTitle(currentTitle) ?? '')
     if (next === null) return
     await updateSession(id, { title: next.trim() || null })
+    setOpenSessionMenuId(null)
     await reloadSessions()
   }
   async function removeSession(id: string) {
     if (!window.confirm('确定删除这个会话吗？')) return
     await deleteSession(id)
+    setOpenSessionMenuId(null)
     await reloadSessions()
+  }
+  async function clearAllSessions() {
+    if (sessions.length === 0) return
+    if (!window.confirm(`确定清空全部 ${sessions.length} 条会话记录吗？此操作不可恢复。`)) return
+    setOpenSessionMenuId(null)
+    setSessions([])
+    p.onSessionsCleared?.()
+    try {
+      await clearSessions()
+    } catch (err) {
+      window.alert(`清空会话记录失败：${String(err instanceof Error ? err.message : err)}`)
+    } finally {
+      await reloadSessions()
+    }
+  }
+
+  async function downloadSession(id: string, format: 'markdown' | 'json') {
+    const { blob, filename } = await exportSession(id, format)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    setOpenSessionMenuId(null)
   }
 
   const selectedProviderModels =
@@ -186,7 +224,10 @@ export function Sidebar(p: Props) {
       </details>
 
       <div className="sidebar-section sessions-section">
-        <label className="field-label">会话 ({sessions.length || fallbackTasks.length})</label>
+        <div className="session-toolbar">
+          <label className="field-label">会话 ({sessions.length || fallbackTasks.length})</label>
+          <button className="ghost-btn session-clear-btn" type="button" onClick={() => { void clearAllSessions() }} disabled={sessions.length === 0}>清空会话记录</button>
+        </div>
         <input className="field session-search" value={sessionQuery} onChange={e => setSessionQuery(e.target.value)} placeholder="搜索会话" />
         <div className="session-list">
           {sessions.length === 0 && fallbackTasks.map(task => (
@@ -205,21 +246,39 @@ export function Sidebar(p: Props) {
             return (
               <div key={s.sessionId}
                 className={`session-row ${s.sessionId === p.currentSessionId ? 'active' : ''}`}
-                onClick={() => p.onLoadSession(s.sessionId)}
+                onClick={() => {
+                  setOpenSessionMenuId(null)
+                  p.onLoadSession(s.sessionId)
+                }}
                 title={`${displayTitle}${repaired ? `\n原始标题：${rawTitle}` : ''}\n${new Date(s.updatedAt).toLocaleString()}`}>
-                <div className="session-title">{displayTitle}</div>
-                <div className="session-meta">
-                  <span>{s.messageCount} 条</span>
-                  <button className="link-btn"
-                    onClick={e => {
-                      e.stopPropagation()
-                      void renameSession(s.sessionId, s.title)
-                    }}>重命名</button>
-                  <button className="link-btn"
-                    onClick={e => {
-                      e.stopPropagation()
-                      void removeSession(s.sessionId)
-                    }}>删除</button>
+                <div className="session-row-main">
+                  <div className="session-copy">
+                    <div className="session-title">{displayTitle}</div>
+                    <div className="session-subtitle">{s.messageCount} 条 · {new Date(s.updatedAt).toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                  </div>
+                  <div className="session-actions">
+                    <div className="session-more-wrap">
+                      <button className="session-icon-btn" type="button" aria-label="更多" title="更多"
+                        onClick={e => {
+                          e.stopPropagation()
+                          setOpenSessionMenuId(openSessionMenuId === s.sessionId ? null : s.sessionId)
+                        }}>…</button>
+                      {openSessionMenuId === s.sessionId && <div className="session-more-menu" onClick={e => e.stopPropagation()}>
+                        <button type="button" onClick={() => { void downloadSession(s.sessionId, 'markdown') }}>导出</button>
+                        <button type="button" onClick={() => { void downloadSession(s.sessionId, 'json') }}>JSON</button>
+                      </div>}
+                    </div>
+                    <button className="session-action-btn" type="button" aria-label="删除" title="删除"
+                      onClick={e => {
+                        e.stopPropagation()
+                        void removeSession(s.sessionId)
+                      }}>删除</button>
+                    <button className="session-action-btn" type="button" aria-label="重命名" title="重命名"
+                      onClick={e => {
+                        e.stopPropagation()
+                        void renameSession(s.sessionId, s.title)
+                      }}>重命名</button>
+                  </div>
                 </div>
               </div>
             )
