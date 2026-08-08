@@ -164,7 +164,7 @@ export function Sidebar(p: Props) {
           <select className="field"
             value={p.selectedAgent ?? ''}
             onChange={e => p.onAgentChange(e.target.value || null)}>
-            <option value="">榛樿鍔╃悊</option>
+            <option value="">选择Agent</option>
             {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
