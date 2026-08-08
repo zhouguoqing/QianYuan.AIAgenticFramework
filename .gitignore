@@ -1,4 +1,4 @@
-bin/
+﻿bin/
 obj/
 *.user
 
@@ -19,3 +19,6 @@ _sandbox/
 appsettings.Development.json
 secrets.json
 .env
+
+# Local snapshots
+artifacts/snapshots/

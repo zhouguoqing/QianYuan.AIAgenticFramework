@@ -1,3 +1,0 @@
-chat1_text_len=9
-chat2_text_len=9
-chat_status=PASS
