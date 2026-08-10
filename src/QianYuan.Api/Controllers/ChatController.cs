@@ -86,6 +86,20 @@ public sealed class ChatController : ControllerBase
         state.Title ??= req.UserText is { Length: > 0 } ? Snippet(req.UserText, 40) : null;
         state.AgentId = agent.Id;
 
+        // Persist the session (including the user turn) before streaming so it exists
+        // immediately: GET /api/sessions/{id} returns 200 instead of 404 while the
+        // reply is still streaming. Previously the web UI reloaded this not-yet-saved
+        // session (404), cleared its in-memory messages and bounced back to the landing
+        // page.
+        try
+        {
+            await _sessions.SaveAsync(state, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to persist session {SessionId} before streaming", sessionId);
+        }
+
         var memoryContext = new MemoryContext(req.WorkspacePath, req.WorkspaceLabel, req.OwnerId, sessionId);
         var memorySnapshot = await _memory.ReadAsync(memoryContext, ct).ConfigureAwait(false);
         var memoryPrompt = BuildMemoryPrompt(memorySnapshot);
@@ -177,14 +191,33 @@ public sealed class ChatController : ControllerBase
     private static string? BuildMemoryPrompt(MemorySnapshot snapshot)
     {
         var sections = new List<string>();
-        if (!string.IsNullOrWhiteSpace(snapshot.UserMemory))
-            sections.Add($"用户级长期记忆：\n{snapshot.UserMemory!.Trim()}");
-        if (!string.IsNullOrWhiteSpace(snapshot.WorkspaceMemory))
-            sections.Add($"工作空间长期记忆：\n{snapshot.WorkspaceMemory!.Trim()}");
+        var userMemory = TrimMeaningful(snapshot.UserMemory);
+        var workspaceMemory = TrimMeaningful(snapshot.WorkspaceMemory);
+        if (userMemory is not null)
+            sections.Add($"用户级长期记忆：\n{userMemory}");
+        if (workspaceMemory is not null)
+            sections.Add($"工作空间长期记忆：\n{workspaceMemory}");
 
         return sections.Count == 0
             ? null
             : "以下是 QIANYUAN 本地记忆，仅用于保持跨会话上下文。不要向用户泄露记忆文件路径，除非用户询问。\n\n" + string.Join("\n\n", sections);
+    }
+
+    /// <summary>
+    /// Extracts meaningful memory content: drops Markdown heading lines (e.g. the auto-initialised
+    /// "# QIANYUAN 用户长期记忆" heading) and blank lines. Auto-created heading-only memory files
+    /// must not be injected into the system prompt, otherwise the Agent role/system prompt is
+    /// replaced by an empty memory section and the model falls back to its own identity.
+    /// </summary>
+    private static string? TrimMeaningful(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var lines = text
+            .Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => line.Length > 0 && !line.StartsWith("#", StringComparison.Ordinal))
+            .ToArray();
+        return lines.Length == 0 ? null : string.Join("\n", lines);
     }
 
     private static string? ExtractAssistantText(IEnumerable<ChatMessage> messages)

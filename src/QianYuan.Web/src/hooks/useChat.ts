@@ -22,6 +22,11 @@ export function useChat(opts: UseChatOptions) {
   const [busy, setBusy] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const loadSeqRef = useRef(0)
+  // True while a streamed chat turn is in flight. During streaming the assistant
+  // messages are already accumulated in memory, and the server-side session may
+  // not be persisted yet (GET /sessions/{id} would 404), so the history-reload
+  // effect must not run and wipe the in-memory messages back to the landing page.
+  const streamingRef = useRef(false)
 
   // Load persisted history when caller switches sessions externally.
   useEffect(() => {
@@ -30,13 +35,16 @@ export function useChat(opts: UseChatOptions) {
       setMessages([])
       return
     }
+    // While a streamed turn is in flight the in-memory messages are authoritative;
+    // reloading here would fetch a not-yet-persisted session (404) and clear the UI.
+    if (streamingRef.current) return
     let alive = true
     getSession(opts.sessionId)
       .then(session => {
         if (!alive || seq !== loadSeqRef.current) return
         setMessages(session.messages.flatMap((message, index) => toDisplayMessages(message, index, session.createdAt)))
       })
-      .catch(() => { if (alive && seq === loadSeqRef.current) setMessages([]) })
+      .catch(() => { /* keep current in-memory messages; do not wipe back to landing */ })
     return () => { alive = false }
   }, [opts.sessionId])
 
@@ -90,6 +98,7 @@ export function useChat(opts: UseChatOptions) {
     const ctrl = new AbortController()
     abortRef.current = ctrl
     setBusy(true)
+    streamingRef.current = true
 
     // Track current assistant streaming message id; tool & observation use their own.
     let assistantId: string | null = null
@@ -106,6 +115,7 @@ export function useChat(opts: UseChatOptions) {
     } finally {
       setBusy(false)
       abortRef.current = null
+      streamingRef.current = false
       setMessages(prev => prev.map(m => m.streaming ? { ...m, streaming: false } : m))
     }
 
