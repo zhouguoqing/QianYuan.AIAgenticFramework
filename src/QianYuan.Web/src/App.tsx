@@ -9,6 +9,7 @@ import { CreditsPanel } from './components/CreditsPanel'
 import { WorkTasksPanel } from './components/WorkTasksPanel'
 import { AccountMenu } from './components/AccountMenu'
 import { useChat } from './hooks/useChat'
+import { useToast } from './components/Toast'
 import type { AuthResponse, ComposerMode, ImageGenerationOptions, ImagePart, ExpertDetailDto, WorkspaceContext } from './types/api'
 import { createSession, getExpertPrompt, getMe, getStoredAuth, logout, storeAuth } from './services/api'
 
@@ -38,6 +39,8 @@ export default function App() {
     systemPrompt: activeExpert?.systemPrompt ?? null,
     onSession: id => setSessionId(id),
   })
+
+  const toast = useToast()
 
   const scrollerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -116,7 +119,7 @@ export default function App() {
       setSessionListVersion(v => v + 1)
     } catch (err) {
       console.error(err)
-      setAccountNotice({ title: '新建会话失败', body: String(err instanceof Error ? err.message : err) })
+      toast.error('新建会话失败', String(err instanceof Error ? err.message : err))
     }
   }
 
@@ -257,9 +260,9 @@ export default function App() {
         onThemeChange={setTheme}
         onOpenCredits={() => { setShowAccountMenu(false); setShowCredits(true) }}
         onOpenGrowthPlan={() => { setShowAccountMenu(false); setShowTasks(true) }}
-        onOpenSettings={() => { setShowAccountMenu(false); setAccountNotice({ title: '设置', body: '运行设置已在左侧栏提供，可配置 Agent、Provider、模型、技能和知识库。' }) }}
-        onOpenHelp={() => { setShowAccountMenu(false); setAccountNotice({ title: '帮助与反馈', body: '请把使用问题、改进建议或异常现象记录下来，当前本地版本会优先保留你的会话和任务上下文。' }) }}
-        onCheckUpdates={() => { setShowAccountMenu(false); setAccountNotice({ title: '检查更新', body: '当前版本为 WorkPartner v0.1.0。本地开发版更新随仓库代码同步。' }) }}
+              onOpenSettings={() => { setShowAccountMenu(false); toast.info('设置', '运行设置已在左侧栏提供，可配置 Agent、Provider、模型、技能和知识库。') }}
+              onOpenHelp={() => { setShowAccountMenu(false); toast.info('帮助与反馈', '请把使用问题、改进建议或异常现象记录下来，当前本地版本会优先保留你的会话和任务上下文。') }}
+              onCheckUpdates={() => { setShowAccountMenu(false); toast.info('检查更新', '当前版本为 WorkPartner v0.1.0。本地开发版更新随仓库代码同步。') }}
         onSignOut={signOut}
         onClose={() => setShowAccountMenu(false)}
       />}
@@ -354,7 +357,7 @@ function HomeLanding({
         ))}
       </div>
 
-      <div className="home-composer-shell">
+      <div className="home-composer-shell" style={{position:'relative'}}>
         <Composer
           busy={busy}
           onSubmit={onSubmit}
@@ -372,12 +375,9 @@ function HomeLanding({
           seedText={seedText}
           seedNonce={seedNonce}
         />
-      </div>
-
-      <div className="buddy-bot" aria-hidden="true">
-        <div className="bot-ear left" />
-        <div className="bot-ear right" />
-        <div className="bot-face"><span /> <span /></div>
+        <div className="buddy-bot" aria-hidden="true" style={{position:'absolute',right:-20,top:'calc(100% + 6px)',width:70,zIndex:2}}>
+          <img src="/avatar-mascot.png" alt="" />
+        </div>
       </div>
     </main>
   )

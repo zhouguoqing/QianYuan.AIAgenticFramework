@@ -1137,39 +1137,59 @@ body { background: var(--bg); color: var(--text); }
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 16px;
-  padding: 3px;
-  border-radius: 9px;
-  background: #ececea;
+  padding: 5px;
+  border-radius: 14px;
+  background: rgba(240,242,237,0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0,0,0,0.05);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.05);
 }
 .home-mode-tabs button, .quick-task-row button {
-  border: none;
-  border-radius: 7px;
-  background: #f6f6f4;
-  color: #4c5052;
-  padding: 7px 12px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #fff;
+  color: #3d4044;
+  padding: 7px 15px;
   font: inherit;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 .home-mode-tabs button.active {
-  background: #333537;
+  background: #2a2d2f;
   color: #fff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
 }
-.home-mode-tabs button:hover, .quick-task-row button:hover { background: #fff; color: #181a1c; }
+.home-mode-tabs button:hover { background: #f0f2ef; color: #181a1c; }
 .quick-task-row {
   width: min(650px, 100%);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .quick-task-row button {
-  border: 1px solid #e5e6e3;
+  border: 1px solid rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  min-height: 32px;
+  border-radius: 11px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+.quick-task-row button:hover {
   background: #fff;
-  min-height: 30px;
+  border-color: rgba(0,0,0,0.12);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
 }
 .home-composer-shell {
+  position: relative !important;
   width: min(650px, 100%);
   border-radius: 14px;
   background: #fff;
@@ -1276,42 +1296,23 @@ body { background: var(--bg); color: var(--text); }
 }
 .buddy-bot {
   position: absolute;
-  right: calc(50% - 326px);
-  top: calc(50% + 42px);
-  width: 56px;
-  height: 42px;
+  right: -20px;
+  bottom: -30px;
+  width: 70px;
+  height: auto;
   pointer-events: none;
+  z-index: 2;
+  animation: mascot-bob 4s ease-in-out infinite;
 }
-.bot-ear {
-  position: absolute;
-  top: 0;
-  width: 18px;
-  height: 20px;
-  border-radius: 8px 8px 4px 4px;
-  background: #7c8589;
+.buddy-bot img {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.10));
 }
-.bot-ear.left { left: 6px; transform: rotate(-24deg); }
-.bot-ear.right { right: 6px; transform: rotate(24deg); }
-.bot-face {
-  position: absolute;
-  left: 5px;
-  right: 5px;
-  bottom: 0;
-  height: 30px;
-  border-radius: 16px 16px 10px 10px;
-  background: #222629;
-  border: 3px solid #d6ddd9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-.bot-face span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 8px rgba(25,196,155,0.8);
+@keyframes mascot-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }
 
 .chat {
@@ -1342,7 +1343,7 @@ body { background: var(--bg); color: var(--text); }
 
 @media (max-width: 1060px) {
   .home-stage { padding-top: 64px; }
-  .buddy-bot { display: none; }
+  .buddy-bot { width: 56px; right: -14px; bottom: -20px; }
 }
 
 @media (max-width: 720px) {
@@ -1365,7 +1366,7 @@ body { background: var(--bg); color: var(--text); }
   .composer textarea { min-height: 70px; padding-top: 10px; padding-bottom: 10px; }
   .mode-tabs { padding-top: 7px; }
   .home-footer-tools { padding-top: 7px; padding-bottom: 0; }
-  .buddy-bot { display: none; }
+  .buddy-bot { width: 50px; right: -10px; bottom: -16px; }
 }
 
 :root[data-theme='dark'] {
@@ -1447,7 +1448,11 @@ body { background: var(--bg); color: var(--text); }
 :root[data-theme='dark'] .composer textarea,
 :root[data-theme='dark'] .mode-tabs,
 :root[data-theme='dark'] .quick-task-row button,
-:root[data-theme='dark'] .home-mode-tabs button,
+:root[data-theme='dark'] .home-mode-tabs {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.08);
+  color: var(--text);
+}
 :root[data-theme='dark'] .modal,
 :root[data-theme='dark'] .account-menu-card,
 :root[data-theme='dark'] .account-notice,
@@ -1466,7 +1471,6 @@ body { background: var(--bg); color: var(--text); }
   border-color: var(--border);
   color: var(--text);
 }
-:root[data-theme='dark'] .home-mode-tabs,
 :root[data-theme='dark'] .appearance-switch,
 :root[data-theme='dark'] .credits-summary,
 :root[data-theme='dark'] .modal-tabs,
