@@ -27,13 +27,16 @@ interface ChatMessageViewProps {
 }
 
 export const ChatMessageView = React.memo(function ChatMessageView({ msg, onRegenerateUserMessage }: ChatMessageViewProps) {
-  const bodyRef = useRef<HTMLDivElement>(null)
+  const htmlBodyRef = useRef<HTMLDivElement>(null)
+  const textBodyRef = useRef<HTMLPreElement>(null)
+  const renderedBody = useMemo(() => renderBodyContent(msg.text || ''), [msg.text])
 
   // Render markdown + process KaTeX async
   useEffect(() => {
     renderUmlDiagrams()
-    if (bodyRef.current) {
-      postProcessKatex(bodyRef.current)
+    const host = htmlBodyRef.current ?? textBodyRef.current
+    if (host) {
+      postProcessKatex(host)
     }
   }, [msg.text, msg.streaming])
 
@@ -58,11 +61,13 @@ export const ChatMessageView = React.memo(function ChatMessageView({ msg, onRege
 
   const body = isPlain
     ? <PlainBlock text={msg.text || ''} label={msg.kind === 'tool' ? '调用参数' : '返回内容'} />
-    : <div
-        ref={bodyRef}
-        className={`body ${msg.streaming ? 'cursor' : ''}`}
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text || '') }}
-      />
+    : renderedBody.mode === 'html'
+      ? <div
+          ref={htmlBodyRef}
+          className={`body ${msg.streaming ? 'cursor' : ''}`}
+          dangerouslySetInnerHTML={{ __html: renderedBody.value }}
+        />
+      : <pre ref={textBodyRef} className={`body markdown-fallback ${msg.streaming ? 'cursor' : ''}`}>{renderedBody.value}</pre>
 
   // Thinking messages: collapsible
   const content = msg.kind === 'thinking'
@@ -168,4 +173,20 @@ function tryPrettyJson(text: string): string {
     const parsed = JSON.parse(text)
     return JSON.stringify(parsed, null, 2)
   } catch { return text }
+}
+
+function renderBodyContent(text: string): { mode: 'html' | 'text'; value: string } {
+  if (!text) return { mode: 'text', value: '' }
+  try {
+    const html = renderMarkdown(text)
+    const visibleText = html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .trim()
+    if (!visibleText) return { mode: 'text', value: text }
+    return { mode: 'html', value: html }
+  } catch {
+    return { mode: 'text', value: text }
+  }
 }

@@ -38,6 +38,56 @@ stop_pid_file() {
     fi
 }
 
+extract_port() {
+    local url="$1"
+    local value="${url##*:}"
+    value="${value%%/*}"
+    echo "$value"
+}
+
+kill_listeners_on_port() {
+    local port="$1" name="$2"
+    local pids
+    pids=$(lsof -ti tcp:"$port" -sTCP:LISTEN 2>/dev/null || true)
+    [[ -z "$pids" ]] && return 0
+    warn "$name port $port is busy; stopping stale listener(s): $pids"
+    for pid in $pids; do
+        kill "$pid" 2>/dev/null || true
+    done
+    sleep 1
+    for pid in $pids; do
+        kill -9 "$pid" 2>/dev/null || true
+    done
+}
+
+wait_http_ready() {
+    local url="$1" timeout_sec="${2:-30}"
+    local max_steps=$((timeout_sec * 2))
+    local i
+    for ((i = 1; i <= max_steps; i++)); do
+        if curl -fsS "$url" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 0.5
+    done
+    return 1
+}
+
+cleanup_orphan_web_processes() {
+    local web_root="$1"
+    local pids
+    pids=$(pgrep -f "$web_root/node_modules/.*vite" 2>/dev/null || true)
+    [[ -z "$pids" ]] && return 0
+    warn "Stopping orphan Web dev process(es): $pids"
+    for pid in $pids; do
+        kill "$pid" 2>/dev/null || true
+    done
+    sleep 1
+    for pid in $pids; do
+        kill -9 "$pid" 2>/dev/null || true
+    done
+}
+
 if [[ "${1:-}" == "--stop" ]]; then
     stop_pid_file "$WEB_PID_FILE" "Web"
     stop_pid_file "$API_PID_FILE" "Api"
@@ -64,6 +114,12 @@ fi
 # --- Stale-process cleanup ---
 stop_pid_file "$API_PID_FILE" "Api (stale)"
 stop_pid_file "$WEB_PID_FILE" "Web (stale)"
+cleanup_orphan_web_processes "$ROOT/$WEB_DIR"
+
+API_PORT=$(extract_port "$API_URL")
+WEB_PORT=$(extract_port "$WEB_URL")
+kill_listeners_on_port "$API_PORT" "Api"
+kill_listeners_on_port "$WEB_PORT" "Web"
 
 # --- Build ---
 info "dotnet restore"
@@ -88,10 +144,16 @@ ASPNETCORE_URLS="$API_URL" \
     > "$LOG_DIR/api.log" 2>&1 &
 echo $! > "$API_PID_FILE"
 
+if wait_http_ready "$API_URL/api/sessions?limit=1" 30; then
+    ok "Api is ready"
+else
+    warn "Api readiness check timed out; Web may show temporary 500 until Api warms up"
+fi
+
 # --- Start Web ---
 if [[ $START_WEB -eq 1 ]]; then
     info "Starting Web → $WEB_URL  (logs: $LOG_DIR/web.log)"
-    (cd "$WEB_DIR" && nohup npm run dev -- --host 0.0.0.0 > "$LOG_DIR/web.log" 2>&1 & echo $! > "$WEB_PID_FILE")
+    (cd "$WEB_DIR" && nohup npm run dev -- --host 0.0.0.0 --port "$WEB_PORT" --strictPort > "$LOG_DIR/web.log" 2>&1 & echo $! > "$WEB_PID_FILE")
 fi
 
 sleep 2

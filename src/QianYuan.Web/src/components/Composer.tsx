@@ -15,6 +15,7 @@ interface Props {
   selectedSkills?: string[]
   onSkillsChange?: (skills: string[]) => void
   onOpenSkillManager?: () => void
+  onOpenConnectorManager?: () => void
   activeExpert?: { id: string; name: string; avatarUrl: string; profession: string } | null
   onClearExpert?: () => void
   seedText?: string
@@ -38,9 +39,12 @@ export function Composer({
   selectedModel = null, onModelChange,
   selectedSkills = [], onSkillsChange,
   onOpenSkillManager,
+  onOpenConnectorManager,
   activeExpert = null, onClearExpert,
   seedText = '', seedNonce = 0,
 }: Props) {
+  const composerRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
   const [text, setText] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [parsingAttachments, setParsingAttachments] = useState(false)
@@ -59,6 +63,35 @@ export function Composer({
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { ref.current?.focus({ preventScroll: true }) }, [])
+
+  useEffect(() => {
+    if (!panel) return
+
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node | null
+      if (!target) return
+      if (!composerRef.current?.contains(target)) setPanel(null)
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setPanel(null)
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [panel])
+
+  useEffect(() => {
+    if (!panel) return
+    // Reset popover scroll when switching panels to avoid landing in a stale scrolled position.
+    requestAnimationFrame(() => {
+      if (popoverRef.current) popoverRef.current.scrollTop = 0
+    })
+  }, [panel])
 
   // Seed the composer text when a caller (e.g. summoning an expert) requests it.
   useEffect(() => {
@@ -117,6 +150,14 @@ export function Composer({
   ), [providers])
 
   const visibleSkills = useMemo(() => skills, [skills])
+  const filteredWorkspaceRoots = useMemo(() => {
+    const q = workspaceSearch.trim().toLowerCase()
+    if (!q) return workspaceRoots
+    return workspaceRoots.filter(root =>
+      root.label.toLowerCase().includes(q)
+      || root.path.toLowerCase().includes(q)
+      || root.id.toLowerCase().includes(q))
+  }, [workspaceRoots, workspaceSearch])
 
   function autoSize(el: HTMLTextAreaElement) {
     el.style.height = 'auto'
@@ -211,6 +252,16 @@ export function Composer({
     setPanel(null)
   }
 
+  function openSkillManager() {
+    onOpenSkillManager?.()
+    setPanel(null)
+  }
+
+  function openConnectorManager() {
+    onOpenConnectorManager?.()
+    setPanel(null)
+  }
+
   function onKey(e: React.KeyboardEvent) {
     // Enter sends. Shift+Enter (or IME composition) inserts a newline.
     if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as any).isComposing) {
@@ -219,7 +270,7 @@ export function Composer({
   }
 
   return (
-    <div className="composer workpartner-composer">
+    <div ref={composerRef} className="composer workpartner-composer">
       <div className="composer-row">
         <textarea
           ref={ref}
@@ -280,8 +331,14 @@ export function Composer({
         <button className="model-chip" type="button" onClick={() => setPanel(panel === 'model' ? null : 'model')}>{modelLabel}</button>
         <button className="mic-btn" type="button" aria-label="语音输入">⌕</button>
         {busy
-          ? <button className="send advanced" onClick={onAbort}>中止</button>
-          : <button className="send advanced" onClick={submit} disabled={!canSubmit(text, attachments.length, mode) || parsingAttachments}><span>{parsingAttachments ? '解析中' : mode === 'chat' ? '发送' : '生成'}</span></button>
+          ? <button className="stop-btn" onClick={onAbort}><span className="stop-btn-icon">■</span><span>中止</span></button>
+          : <button
+              className="send-btn"
+              onClick={submit}
+              disabled={!canSubmit(text, attachments.length, mode) || parsingAttachments}
+              aria-label={parsingAttachments ? '解析中' : mode === 'chat' ? '发送' : '生成'}>
+              <span>{parsingAttachments ? '…' : '➤'}</span>
+            </button>
         }
       </div>
 
@@ -291,13 +348,13 @@ export function Composer({
           e.currentTarget.value = ''
         }} />
 
-      {panel && <div className={`composer-popover ${panel}-panel`}>
+      {panel && <div ref={popoverRef} className={`composer-popover ${panel}-panel`}>
         {panel === 'add' && <>
           <button className="popover-row" type="button" onClick={openFiles}><span>◎</span><strong>添加文件</strong><em>›</em></button>
           <button className="popover-row" type="button" onClick={() => setPanel('mode')}><span>✦</span><strong>切换模式</strong><em>文生图 / 图生图</em></button>
           <button className="popover-row" type="button" onClick={() => setPanel('expert')}><span>☷</span><strong>选择专家</strong><em>行业专长</em></button>
-          <button className="popover-row active" type="button" onClick={() => setPanel('skill')}><span>⌁</span><strong>技能选择</strong><em>辅助工具</em></button>
-          <button className="popover-row" type="button"><span>∞</span><strong>连接器</strong><em>第三方服务</em></button>
+          <button className="popover-row" type="button" onClick={() => setPanel('skill')}><span>⌁</span><strong>技能选择</strong><em>辅助工具</em></button>
+          <button className="popover-row" type="button" onClick={openConnectorManager}><span>∞</span><strong>连接器</strong><em>第三方服务</em></button>
         </>}
 
         {panel === 'mode' && <>
@@ -320,10 +377,17 @@ export function Composer({
             </label>
           </div>
 
-          <button className="workspace-row" type="button" onClick={() => chooseWorkspace(workspace || workspaceRoots[0]?.id || '')}>
-            <span className="workspace-row-icon" aria-hidden="true">★</span>
-            <span className="workspace-row-text" title={workspaceLabel}>{workspaceLabel}</span>
-          </button>
+          <div className="workspace-list">
+            {filteredWorkspaceRoots.map(root => <button
+              key={root.id}
+              className={`workspace-row ${workspace === root.id ? 'active' : ''}`}
+              type="button"
+              onClick={() => chooseWorkspace(root.id)}>
+              <span className="workspace-row-icon" aria-hidden="true">📁</span>
+              <span className="workspace-row-text" title={root.label || root.path}>{root.label || root.path}</span>
+            </button>)}
+            {filteredWorkspaceRoots.length === 0 && <div className="workspace-empty">没有匹配的工作空间</div>}
+          </div>
 
           <div className="workspace-divider" />
 
@@ -341,16 +405,24 @@ export function Composer({
         {panel === 'permission' && <>
           <div className="permission-panel-body">
             <PanelTitle title="权限管理" hint="数据安全与操作控制" />
-            <p style={{ fontSize: '10px', color: '#666', margin: '4px 0', lineHeight: '1.4' }}>当前权限为完全访问。建议对不可信任的任务进行权限限制。</p>
+            <p style={{ fontSize: '10px', color: '#666', margin: '4px 0', lineHeight: '1.4' }}>根据任务风险选择权限级别，默认建议使用“操作前确认”。</p>
             <div className="permission-divider" />
-            <label className="permission-toggle-row">
-              <span>允许完全访问</span>
-              <input
-                type="checkbox"
-                checked={permission === 'full'}
-                onChange={e => choosePermission(e.target.checked ? 'full' : 'confirm')}
-              />
-            </label>
+            {permissionOptions.map(option => (
+              <button
+                key={option.id}
+                type="button"
+                className={`choice-row ${permission === option.id ? 'active' : ''}`}
+                onClick={() => choosePermission(option.id)}>
+                <strong>{option.label}</strong>
+                <span>
+                  {option.id === 'full'
+                    ? '可读写文件并执行工具，适合可信任务'
+                    : option.id === 'readonly'
+                    ? '仅允许读取上下文，不做写操作'
+                    : '执行关键操作前先征求确认'}
+                </span>
+              </button>
+            ))}
           </div>
         </>}
 
@@ -380,7 +452,7 @@ export function Composer({
           </div>
           <div className="popover-footer">
             <button type="button" onClick={openFiles}>从本地添加</button>
-            <button type="button" onClick={onOpenSkillManager}>管理技能</button>
+            <button type="button" onClick={openSkillManager}>管理技能</button>
           </div>
         </>}
       </div>}

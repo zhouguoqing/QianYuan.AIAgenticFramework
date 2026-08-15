@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type {
   AgentStoreAgentDto,
@@ -50,6 +50,7 @@ type ExpertForm = {
 interface Props {
   onBack: () => void
   onLaunch: (prompt: string, expert: ExpertDetailDto) => void
+  initialTopTab?: TopTab
 }
 
 const emptyForm: ExpertForm = {
@@ -78,14 +79,26 @@ function Avatar({ expert, size = 40 }: { expert: ExpertSummaryDto; size?: number
   return <img className="expert-avatar" style={style} src={expert.avatarUrl} alt={expert.name} loading="lazy" onError={() => setFailed(true)} />
 }
 
-export function ExpertMarketplace({ onBack, onLaunch }: Props) {
-  const [topTab, setTopTab] = useState<TopTab>('experts')
+export function ExpertMarketplace({ onBack, onLaunch, initialTopTab = 'experts' }: Props) {
+  const [topTab, setTopTab] = useState<TopTab>(initialTopTab)
   const [kind, setKind] = useState<ExpertKind>('agent')
   const [sort, setSort] = useState<SortMode>('hot')
   const [category, setCategory] = useState<string>('all')
   const [query, setQuery] = useState('')
   const [customOnly, setCustomOnly] = useState(false)
   const [refreshNonce, setRefreshNonce] = useState(0)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setTopTab(initialTopTab)
+  }, [initialTopTab])
+
+  useEffect(() => {
+    if (topTab !== 'connectors') return
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus({ preventScroll: true })
+    })
+  }, [topTab])
   const [skillInstalledOnly, setSkillInstalledOnly] = useState(false)
   const [showSkillCreate, setShowSkillCreate] = useState(false)
   const [skillInstalledCount, setSkillInstalledCount] = useState(0)
@@ -234,7 +247,7 @@ export function ExpertMarketplace({ onBack, onLaunch }: Props) {
           </button>
         </div>
         <div className="market-actions">
-          <label className="market-search"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder={topTab === 'skills' ? '搜索技能' : topTab === 'connectors' ? '搜索连接器' : '搜索专家或专家团'} /></label>
+          <label className="market-search"><span>⌕</span><input ref={searchInputRef} value={query} onChange={e => setQuery(e.target.value)} placeholder={topTab === 'skills' ? '搜索技能' : topTab === 'connectors' ? '搜索连接器' : '搜索专家或专家团'} /></label>
           {topTab === 'skills' ? (
             <>
               <button className={`market-mine ${skillInstalledOnly ? 'active' : ''}`} type="button" onClick={() => setSkillInstalledOnly(v => !v)}>我安装的 {skillInstalledCount}</button>

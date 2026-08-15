@@ -7,8 +7,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': { target: 'http://localhost:5050', changeOrigin: true },
-      '/hubs': { target: 'http://localhost:5050', changeOrigin: true, ws: true }
+      '/api': { target: 'http://127.0.0.1:5050', changeOrigin: true },
+      '/hubs': { target: 'http://127.0.0.1:5050', changeOrigin: true, ws: true }
     }
   },
   build: { outDir: 'dist', sourcemap: true }

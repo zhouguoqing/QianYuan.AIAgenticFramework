@@ -14,6 +14,7 @@ namespace QianYuan.Skills.Builtin.Code;
 public sealed class CodeExecutionSkill : ISkill
 {
     private readonly CodeExecutionOptions _opts;
+    private const string AnonymousOwner = "anonymous";
 
     public CodeExecutionSkill(CodeExecutionOptions opts)
     {
@@ -53,16 +54,19 @@ public sealed class CodeExecutionSkill : ISkill
             return SkillInvocationResult.Error($"runtime '{runtime}' not allowed");
         if (string.IsNullOrEmpty(code)) return SkillInvocationResult.Error("'code' is required");
 
-        var (fileName, fileArgs, suffix) = runtime switch
+        var (fileName, suffix) = runtime switch
         {
-            "python" => ("python3", "{file}", ".py"),
-            "node" => ("node", "{file}", ".js"),
-            "bash" => ("bash", "{file}", ".sh"),
-            _ => ("", "", "")
+            "python" => ("python3", ".py"),
+            "node" => ("node", ".js"),
+            "bash" => ("bash", ".sh"),
+            _ => ("", "")
         };
         if (string.IsNullOrEmpty(fileName)) return SkillInvocationResult.Error($"unsupported runtime '{runtime}'");
 
-        var temp = Path.Combine(_opts.SandboxDirectory, $"snippet_{Guid.NewGuid():N}{suffix}");
+        var sandboxDirectory = ResolveInvocationSandboxDirectory(context);
+        Directory.CreateDirectory(sandboxDirectory);
+
+        var temp = Path.Combine(sandboxDirectory, $"snippet_{Guid.NewGuid():N}{suffix}");
         await File.WriteAllTextAsync(temp, code, ct).ConfigureAwait(false);
         try
         {
@@ -75,7 +79,7 @@ public sealed class CodeExecutionSkill : ISkill
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
-                WorkingDirectory = _opts.SandboxDirectory,
+                WorkingDirectory = sandboxDirectory,
             };
             psi.ArgumentList.Add(temp);
 
@@ -103,6 +107,43 @@ public sealed class CodeExecutionSkill : ISkill
         {
             try { File.Delete(temp); } catch { }
         }
+    }
+
+    private string ResolveInvocationSandboxDirectory(SkillInvocationContext context)
+    {
+        var ownerId = context.Metadata is not null
+            && context.Metadata.TryGetValue("ownerId", out var value)
+            ? value
+            : null;
+        ownerId = string.IsNullOrWhiteSpace(ownerId) ? AnonymousOwner : ownerId;
+
+        var safeOwner = SanitizeSegment(ownerId!);
+        var safeSession = SanitizeSegment(context.SessionId);
+        var root = Path.GetFullPath(_opts.SandboxDirectory);
+        var scoped = Path.Combine(root, "users", safeOwner, "sessions", safeSession);
+        var scopedFull = Path.GetFullPath(scoped);
+
+        if (!scopedFull.StartsWith(root, StringComparison.Ordinal))
+            throw new InvalidOperationException("resolved sandbox path escapes configured root");
+
+        return scopedFull;
+    }
+
+    private static string SanitizeSegment(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length == 0) return "unknown";
+
+        var builder = new StringBuilder(trimmed.Length);
+        foreach (var ch in trimmed)
+        {
+            if (char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.') builder.Append(ch);
+            else builder.Append('_');
+        }
+
+        var sanitized = builder.ToString().Trim('.');
+        if (sanitized.Length == 0) sanitized = "unknown";
+        return sanitized.Length > 80 ? sanitized[..80] : sanitized;
     }
 
     private static string Truncate(string s, int max) => s.Length > max ? s[..max] + "...[truncated]" : s;

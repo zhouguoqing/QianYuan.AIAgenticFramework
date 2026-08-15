@@ -19,6 +19,7 @@ export default function App() {
   const [auth, setAuth] = useState<AuthResponse | null>(() => getStoredAuth())
   const [theme, setTheme] = useState<'light' | 'dark'>(() => localStorage.getItem('workpartner.theme') === 'dark' ? 'dark' : 'light')
   const [view, setView] = useState<'chat' | 'agent-store' | 'experts'>('chat')
+  const [expertTopTab, setExpertTopTab] = useState<'experts' | 'skills' | 'connectors'>('experts')
   const [agentId, setAgentId] = useState<string | null>(null)
   const [provider, setProvider] = useState<string | null>(null)
   const [model, setModel] = useState<string | null>(null)
@@ -33,6 +34,7 @@ export default function App() {
   const [composerSeed, setComposerSeed] = useState<{ text: string; nonce: number }>({ text: '', nonce: 0 })
   const [accountNotice, setAccountNotice] = useState<{ title: string; body: string } | null>(null)
   const [authPrompt, setAuthPrompt] = useState<{ reason: string; mode?: 'login' | 'register' } | null>(null)
+  const postAuthActionRef = useRef<null | (() => void)>(null)
 
   const { messages, busy, send, abort, reset, regenerate } = useChat({
     agentId, provider, model, skills, sessionId,
@@ -82,6 +84,7 @@ export default function App() {
     setShowAccountMenu(false)
     setAccountNotice(null)
     setView('chat')
+    postAuthActionRef.current = null
   }
 
   function completeAuth(next: AuthResponse) {
@@ -91,10 +94,14 @@ export default function App() {
     setShowCredits(false)
     setShowTasks(false)
     setShowAccountMenu(false)
+    const postAuthAction = postAuthActionRef.current
+    postAuthActionRef.current = null
+    postAuthAction?.()
   }
 
   function requireAuth(reason: string, action?: () => void) {
     if (!auth) {
+      postAuthActionRef.current = action ?? null
       setAuthPrompt({ reason })
       return false
     }
@@ -169,6 +176,11 @@ export default function App() {
     setShowAccountMenu(true)
   }
 
+  function openExpertMarketplace(tab: 'experts' | 'skills' | 'connectors' = 'experts') {
+    setExpertTopTab(tab)
+    setView('experts')
+  }
+
   async function summonExpert(prompt: string, expert: ExpertDetailDto) {
     setView('chat')
     setAgentId(expert.boundAgentId ?? null)
@@ -192,7 +204,7 @@ export default function App() {
     <div className="app">
       <Sidebar
         onOpenAgentStore={() => requireAuth('登录后可以管理专家、技能和连接器。', () => setView('agent-store'))}
-        onOpenExperts={() => requireAuth('登录后可以浏览并召唤专家。', () => setView('experts'))}
+        onOpenExperts={() => requireAuth('登录后可以浏览并召唤专家。', () => openExpertMarketplace('experts'))}
         onOpenAccountMenu={() => auth ? openAccountMenu('sidebar') : setAuthPrompt({ reason: '登录或注册后继续使用。' })}
         userName={auth?.user.displayName ?? '访客'}
         selectedAgent={agentId} onAgentChange={setAgentId}
@@ -209,6 +221,7 @@ export default function App() {
         : view === 'experts' ? <ExpertMarketplace
           onBack={() => setView('chat')}
           onLaunch={summonExpert}
+          initialTopTab={expertTopTab}
         />
         : <div className="main">
         {hasActiveChat ? <>
@@ -227,6 +240,8 @@ export default function App() {
             onModelChange={setModel}
             selectedSkills={skills}
             onSkillsChange={setSkills}
+            onOpenSkillManager={() => requireAuth('登录后可以管理技能。', () => setView('agent-store'))}
+            onOpenConnectorManager={() => requireAuth('登录后可以管理连接器。', () => openExpertMarketplace('connectors'))}
             activeExpert={activeExpert}
             onClearExpert={() => setActiveExpert(null)}
             seedText={composerSeed.text}
@@ -245,6 +260,8 @@ export default function App() {
           onModelChange={setModel}
           selectedSkills={skills}
           onSkillsChange={setSkills}
+          onOpenSkillManager={() => requireAuth('登录后可以管理技能。', () => setView('agent-store'))}
+          onOpenConnectorManager={() => requireAuth('登录后可以管理连接器。', () => openExpertMarketplace('connectors'))}
           activeExpert={activeExpert}
           onClearExpert={() => setActiveExpert(null)}
           seedText={composerSeed.text}
@@ -302,6 +319,8 @@ interface HomeLandingProps {
   onModelChange: (model: string | null) => void
   selectedSkills: string[]
   onSkillsChange: (skills: string[]) => void
+  onOpenSkillManager: () => void
+  onOpenConnectorManager: () => void
   activeExpert: ActiveExpert | null
   onClearExpert: () => void
   seedText: string
@@ -314,6 +333,7 @@ function HomeLanding({
   selectedProvider, onProviderChange,
   selectedModel, onModelChange,
   selectedSkills, onSkillsChange,
+  onOpenSkillManager, onOpenConnectorManager,
   activeExpert, onClearExpert, seedText, seedNonce,
 }: HomeLandingProps) {
   const [activeModeLabel, setActiveModeLabel] = useState('代码开发')
@@ -370,6 +390,8 @@ function HomeLanding({
           onModelChange={onModelChange}
           selectedSkills={selectedSkills}
           onSkillsChange={onSkillsChange}
+          onOpenSkillManager={onOpenSkillManager}
+          onOpenConnectorManager={onOpenConnectorManager}
           activeExpert={activeExpert}
           onClearExpert={onClearExpert}
           seedText={seedText}
