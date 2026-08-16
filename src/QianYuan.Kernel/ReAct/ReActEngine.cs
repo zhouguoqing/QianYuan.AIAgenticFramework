@@ -1,9 +1,11 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using QianYuan.Core.Abstractions;
 using QianYuan.Core.Exceptions;
 using QianYuan.Core.Models;
+using QianYuan.Core.Sandbox;
 using QianYuan.Core.Streaming;
 
 namespace QianYuan.Kernel.ReAct;
@@ -236,12 +238,15 @@ public sealed class ReActEngine
             var dispatch = request.Dispatcher
                 ?? throw new InvalidOperationException("ReActRunRequest.Dispatcher is required when tools are used.");
 
+            var leaseManager = request.Services.GetService<ISandboxLeaseManager>();
+
             var ctx = new SkillInvocationContext
             {
                 AgentId = request.SelfAgentId ?? "agent",
                 SessionId = request.SessionId,
                 Services = request.Services,
                 Metadata = request.Metadata,
+                SandboxPolicy = request.SandboxPolicy,
             };
 
             // Run sequentially by default to keep observation ordering simple; can be parallelised by setting opt.
@@ -250,15 +255,51 @@ public sealed class ReActEngine
                 ct.ThrowIfCancellationRequested();
                 _logger.LogInformation("ReAct iter {Iter} -> tool {Tool}", iteration, call.Name);
 
+                SandboxLease? lease = null;
+                var effectivePolicy = ctx.SandboxPolicy;
+                if (leaseManager is not null && effectivePolicy is not null)
+                {
+                    lease = await leaseManager.AcquireAsync(effectivePolicy, ct).ConfigureAwait(false);
+                    effectivePolicy = effectivePolicy with
+                    {
+                        LeaseId = lease.LeaseId,
+                        LeaseDirectory = lease.LeaseDirectory,
+                        LeaseExpiresAt = lease.ExpiresAt,
+                    };
+                }
+
+                var callContext = new SkillInvocationContext
+                {
+                    AgentId = ctx.AgentId,
+                    SessionId = ctx.SessionId,
+                    Services = ctx.Services,
+                    Metadata = ctx.Metadata,
+                    SandboxPolicy = effectivePolicy,
+                };
+
                 SkillInvocationResult result;
                 try
                 {
                     result = loop.TryBlockToolCall(call.Name, call.Args.ToString())
-                        ?? await dispatch.InvokeAsync(call.Name, call.Args.ToString(), ctx, ct).ConfigureAwait(false);
+                        ?? await dispatch.InvokeAsync(call.Name, call.Args.ToString(), callContext, ct).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
                     result = SkillInvocationResult.Error(ex.Message);
+                }
+                finally
+                {
+                    if (lease is not null && leaseManager is not null)
+                    {
+                        try
+                        {
+                            await leaseManager.ReleaseAsync(lease.LeaseId, ct).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to release sandbox lease {LeaseId}", lease.LeaseId);
+                        }
+                    }
                 }
 
                 result = loop.BoundObservation(result);
@@ -388,5 +429,6 @@ public sealed class ReActRunRequest
     public IReadOnlyList<string>? PreloadSkills { get; init; }
     public int? MaxIterations { get; init; }
     public IReadOnlyDictionary<string, string>? Metadata { get; init; }
+    public SandboxPolicySnapshot? SandboxPolicy { get; init; }
     internal LoopEngineeringRuntime? LoopEngineering { get; init; }
 }

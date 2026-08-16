@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using QianYuan.Core.Abstractions;
 using QianYuan.Core.Models;
+using QianYuan.Core.Sandbox;
 
 namespace QianYuan.Skills.Builtin.FileSystem;
 
@@ -132,27 +133,35 @@ public sealed class FileSystemSkill : ISkill
 
     private string ResolveRoot(SkillInvocationContext context)
     {
-        if (context.Metadata is not null
-            && context.Metadata.TryGetValue("workspacePath", out var workspacePath)
-            && !string.IsNullOrWhiteSpace(workspacePath))
+        var workspaceRoot = context.SandboxPolicy?.WorkspaceRoot
+            ?? ResolveMetadataValue(context, "workspacePath");
+
+        if (!string.IsNullOrWhiteSpace(workspaceRoot))
         {
-            var full = Path.GetFullPath(workspacePath);
+            var full = Path.GetFullPath(workspaceRoot);
             Directory.CreateDirectory(full);
             return full;
         }
+
         return _rootFull;
     }
 
     private bool CanWrite(SkillInvocationContext context)
     {
         if (_readOnly) return false;
+
+        var policy = context.SandboxPolicy;
+        if (policy is not null) return policy.AllowsWrite;
+
         if (context.Metadata is null) return true;
-        if (!context.Metadata.TryGetValue("permission", out var permission) || string.IsNullOrWhiteSpace(permission))
-            return true;
+        if (!context.Metadata.TryGetValue("permission", out var permission) || string.IsNullOrWhiteSpace(permission)) return true;
 
         return string.Equals(permission, "full", StringComparison.OrdinalIgnoreCase)
             || string.Equals(permission, "write", StringComparison.OrdinalIgnoreCase);
     }
+
+    private static string? ResolveMetadataValue(SkillInvocationContext context, string key)
+        => context.Metadata is not null && context.Metadata.TryGetValue(key, out var value) ? value : null;
 
     private static string Resolve(string rootFull, string rel)
     {

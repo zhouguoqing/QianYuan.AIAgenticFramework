@@ -81,6 +81,7 @@ public sealed class ToolDispatcher : IToolDispatcher
         {
             Messages = [ChatMessage.User(input)],
             SessionId = context.SessionId,
+            SandboxPolicy = context.SandboxPolicy,
         };
 
         var sb = new System.Text.StringBuilder();

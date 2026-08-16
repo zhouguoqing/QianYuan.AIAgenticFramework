@@ -1,4 +1,5 @@
 using QianYuan.Core.Models;
+using QianYuan.Core.Sandbox;
 using QianYuan.Core.Streaming;
 
 namespace QianYuan.Core.Abstractions;
@@ -51,6 +52,9 @@ public sealed class AgentRunRequest
 
     /// <summary>Optional metadata bag (user id, tenant, locale, ...).</summary>
     public IReadOnlyDictionary<string, string>? Metadata { get; init; }
+
+    /// <summary>Resolved per-call sandbox facts for this run.</summary>
+    public SandboxPolicySnapshot? SandboxPolicy { get; init; }
 }
 
 /// <summary>Registry for agents - allows agent-as-tool composition and dynamic discovery.</summary>

@@ -8,6 +8,7 @@ using QianYuan.Api.Hubs;
 using QianYuan.Api.Services;
 using QianYuan.Core.Abstractions;
 using QianYuan.Core.Memory;
+using QianYuan.Core.Sandbox;
 using QianYuan.Data;
 using QianYuan.Data.Services;
 using QianYuan.Integrations.DingTalk;
@@ -46,6 +47,79 @@ builder.Services.AddScoped<IExpertTeamService, ExpertTeamService>();
 builder.Services.AddSingleton<IExpertTeamTemplateService, ExpertTeamTemplateService>();
 builder.Services.AddScoped<ISkillMarketplaceService, SkillMarketplaceService>();
 builder.Services.AddSingleton<IMemoryService, LocalMemoryService>();
+builder.Services.AddSingleton<IChatSandboxPolicyService, ChatSandboxPolicyService>();
+var leaseRoot = qy.CodeExecution is { SandboxDirectory.Length: > 0 }
+    ? qy.CodeExecution.SandboxDirectory
+    : qy.FileSystemSkill is { SandboxDirectory.Length: > 0 }
+        ? qy.FileSystemSkill.SandboxDirectory
+        : "./_sandbox/runtime";
+var leaseTtl = TimeSpan.FromSeconds(Math.Max(30, qy.SandboxLease.TtlSeconds));
+var leaseCleanupInterval = TimeSpan.FromSeconds(Math.Max(5, qy.SandboxLease.CleanupIntervalSeconds));
+builder.Services.AddSingleton(_ => new InMemorySandboxLeaseManager(leaseRoot, leaseTtl));
+builder.Services.AddSingleton<ISandboxLeaseManager>(sp => sp.GetRequiredService<InMemorySandboxLeaseManager>());
+builder.Services.AddSingleton(_ => new LocalCodeExecutionWorkerClient(qy.SandboxWorker.WorkerId));
+builder.Services.AddSingleton(qy.SandboxWorker);
+builder.Services.AddSingleton<SandboxWorkerHealthStateCache>();
+builder.Services.AddSingleton<IReadOnlyList<HttpCodeExecutionWorkerClient>>(sp =>
+{
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    var remotes = new List<HttpCodeExecutionWorkerClient>();
+
+    if (string.Equals(qy.SandboxWorker.Mode, "http", StringComparison.OrdinalIgnoreCase))
+    {
+        var configuredWorkers = qy.SandboxWorker.Workers
+            .Where(w => !string.IsNullOrWhiteSpace(w.BaseUrl))
+            .ToArray();
+
+        if (configuredWorkers.Length > 0)
+        {
+            foreach (var worker in configuredWorkers)
+            {
+                var http = factory.CreateClient();
+                http.BaseAddress = new Uri(worker.BaseUrl, UriKind.Absolute);
+                remotes.Add(new HttpCodeExecutionWorkerClient(
+                    http,
+                    string.IsNullOrWhiteSpace(worker.WorkerId) ? worker.BaseUrl : worker.WorkerId,
+                    worker.Weight,
+                    qy.SandboxWorker.ExecutePath,
+                    worker.AuthToken ?? qy.SandboxWorker.AuthToken));
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(qy.SandboxWorker.BaseUrl))
+        {
+            var http = factory.CreateClient();
+            http.BaseAddress = new Uri(qy.SandboxWorker.BaseUrl, UriKind.Absolute);
+            remotes.Add(new HttpCodeExecutionWorkerClient(
+                http,
+                "sandbox-worker-default",
+                1,
+                qy.SandboxWorker.ExecutePath,
+                qy.SandboxWorker.AuthToken));
+        }
+    }
+
+    return remotes;
+});
+builder.Services.AddSingleton<ICodeExecutionWorkerClient>(sp => new RoutedCodeExecutionWorkerClient(
+    sp.GetRequiredService<LocalCodeExecutionWorkerClient>(),
+    sp.GetRequiredService<IReadOnlyList<HttpCodeExecutionWorkerClient>>(),
+    sp.GetRequiredService<SandboxWorkerHealthStateCache>(),
+    string.Equals(qy.SandboxWorker.Mode, "http", StringComparison.OrdinalIgnoreCase),
+    qy.SandboxWorker.FallbackToLocal,
+    Math.Max(0, qy.SandboxWorker.MaxRetries),
+    TimeSpan.FromMilliseconds(Math.Max(0, qy.SandboxWorker.RetryDelayMs)),
+    Math.Max(1, qy.SandboxWorker.CircuitBreakFailureThreshold),
+    TimeSpan.FromSeconds(Math.Max(1, qy.SandboxWorker.CircuitBreakOpenSeconds)),
+    sp.GetRequiredService<ILogger<RoutedCodeExecutionWorkerClient>>()));
+builder.Services.AddHostedService(sp => new SandboxLeaseCleanupHostedService(
+    sp.GetRequiredService<InMemorySandboxLeaseManager>(),
+    leaseCleanupInterval,
+    sp.GetRequiredService<ILogger<SandboxLeaseCleanupHostedService>>()));
+builder.Services.AddHostedService(sp => new SandboxWorkerHealthProbeHostedService(
+    sp.GetRequiredService<IReadOnlyList<HttpCodeExecutionWorkerClient>>(),
+    sp.GetRequiredService<SandboxWorkerHealthStateCache>(),
+    sp.GetRequiredService<SandboxWorkerOptions>(),
+    sp.GetRequiredService<ILogger<SandboxWorkerHealthProbeHostedService>>()));
 builder.Services.AddSingleton<IWorkTaskExecutionHarness, WorkTaskExecutionHarness>();
 builder.Services.AddSingleton<IExpertCatalogService, ExpertCatalogService>();
 builder.Services.AddScoped<ICustomExpertService, CustomExpertService>();

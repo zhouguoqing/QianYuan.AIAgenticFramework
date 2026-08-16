@@ -88,6 +88,7 @@ public sealed class ReActAgent : IAgent
             PreloadSkills = request.PreloadSkills ?? _def.PreloadSkills,
             MaxIterations = request.MaxIterations ?? _def.MaxIterations,
             Metadata = request.Metadata,
+            SandboxPolicy = request.SandboxPolicy,
         };
 
         await foreach (var chunk in engine.RunAsync(req, ct).ConfigureAwait(false))

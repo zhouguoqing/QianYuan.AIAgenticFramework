@@ -2,8 +2,10 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.DependencyInjection;
 using QianYuan.Core.Abstractions;
 using QianYuan.Core.Models;
+using QianYuan.Core.Sandbox;
 
 namespace QianYuan.Skills.Builtin.Code;
 
@@ -66,6 +68,47 @@ public sealed class CodeExecutionSkill : ISkill
         var sandboxDirectory = ResolveInvocationSandboxDirectory(context);
         Directory.CreateDirectory(sandboxDirectory);
 
+        var workerClient = context.Services.GetService<ICodeExecutionWorkerClient>();
+        if (workerClient is not null)
+        {
+            var workerRequest = new CodeExecutionWorkerRequest
+            {
+                Runtime = runtime,
+                Code = code,
+                WorkingDirectory = sandboxDirectory,
+                Timeout = _opts.PerCallTimeout,
+                MaxOutputChars = _opts.MaxOutputChars,
+                LeaseId = context.SandboxPolicy?.LeaseId,
+                SessionId = context.SessionId,
+                OwnerId = context.SandboxPolicy?.OwnerId,
+                WorkspaceId = context.SandboxPolicy?.WorkspaceId,
+            };
+
+            var workerResult = await workerClient.ExecuteAsync(workerRequest, ct).ConfigureAwait(false);
+            if (!workerResult.Succeeded)
+            {
+                var failure = workerResult.ErrorMessage
+                    ?? (workerResult.TimedOut
+                        ? $"execution timed out after {_opts.PerCallTimeout}"
+                        : "worker execution failed");
+                return SkillInvocationResult.Error(failure);
+            }
+
+            var payload = JsonSerializer.Serialize(new
+            {
+                exitCode = workerResult.ExitCode,
+                stdout = workerResult.Stdout,
+                stderr = workerResult.Stderr,
+                workerId = workerResult.WorkerId,
+                attempt = workerResult.Attempt,
+                durationMs = workerResult.DurationMs,
+            });
+            var summary = workerResult.ExitCode == 0
+                ? $"ran ok ({workerResult.Stdout.Length} bytes stdout)"
+                : $"exit {workerResult.ExitCode}";
+            return SkillInvocationResult.Ok(payload, summary);
+        }
+
         var temp = Path.Combine(sandboxDirectory, $"snippet_{Guid.NewGuid():N}{suffix}");
         await File.WriteAllTextAsync(temp, code, ct).ConfigureAwait(false);
         try
@@ -111,16 +154,34 @@ public sealed class CodeExecutionSkill : ISkill
 
     private string ResolveInvocationSandboxDirectory(SkillInvocationContext context)
     {
-        var ownerId = context.Metadata is not null
-            && context.Metadata.TryGetValue("ownerId", out var value)
-            ? value
-            : null;
-        ownerId = string.IsNullOrWhiteSpace(ownerId) ? AnonymousOwner : ownerId;
+        var policy = context.SandboxPolicy;
+        if (!string.IsNullOrWhiteSpace(policy?.LeaseDirectory))
+        {
+            var leaseDir = Path.GetFullPath(policy.LeaseDirectory);
+            var sandboxRoot = Path.GetFullPath(_opts.SandboxDirectory);
+            if (!leaseDir.StartsWith(sandboxRoot, StringComparison.Ordinal))
+                throw new InvalidOperationException("resolved lease path escapes configured root");
 
-        var safeOwner = SanitizeSegment(ownerId!);
+            return leaseDir;
+        }
+
+        var ownerId = policy?.OwnerId
+            ?? ResolveMetadataValue(context, "ownerId")
+            ?? AnonymousOwner;
+
+        var workspaceKey = policy?.WorkspaceId
+            ?? policy?.WorkspaceLabel
+            ?? policy?.WorkspaceRoot
+            ?? ResolveMetadataValue(context, "workspaceId")
+            ?? ResolveMetadataValue(context, "workspaceLabel")
+            ?? ResolveMetadataValue(context, "workspacePath")
+            ?? "default-workspace";
+
+        var safeOwner = SanitizeSegment(ownerId);
+        var safeWorkspace = SanitizeSegment(workspaceKey);
         var safeSession = SanitizeSegment(context.SessionId);
         var root = Path.GetFullPath(_opts.SandboxDirectory);
-        var scoped = Path.Combine(root, "users", safeOwner, "sessions", safeSession);
+        var scoped = Path.Combine(root, "users", safeOwner, "workspaces", safeWorkspace, "sessions", safeSession);
         var scopedFull = Path.GetFullPath(scoped);
 
         if (!scopedFull.StartsWith(root, StringComparison.Ordinal))
@@ -128,6 +189,9 @@ public sealed class CodeExecutionSkill : ISkill
 
         return scopedFull;
     }
+
+    private static string? ResolveMetadataValue(SkillInvocationContext context, string key)
+        => context.Metadata is not null && context.Metadata.TryGetValue(key, out var value) ? value : null;
 
     private static string SanitizeSegment(string value)
     {

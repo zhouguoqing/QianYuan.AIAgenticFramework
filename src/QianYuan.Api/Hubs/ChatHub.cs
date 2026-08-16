@@ -4,6 +4,7 @@ using QianYuan.Core.Abstractions;
 using QianYuan.Core.Memory;
 using QianYuan.Core.Models;
 using QianYuan.Core.Streaming;
+using QianYuan.Api.Services;
 
 namespace QianYuan.Api.Hubs;
 
@@ -18,11 +19,15 @@ public sealed class ChatHub : Hub
 {
     private readonly IAgentRegistry _agents;
     private readonly ISessionStore _sessions;
+    private readonly IChatSandboxPolicyService _sandboxPolicy;
     private readonly ILogger<ChatHub> _logger;
 
-    public ChatHub(IAgentRegistry agents, ISessionStore sessions, ILogger<ChatHub> logger)
+    public ChatHub(IAgentRegistry agents, ISessionStore sessions, IChatSandboxPolicyService sandboxPolicy, ILogger<ChatHub> logger)
     {
-        _agents = agents; _sessions = sessions; _logger = logger;
+        _agents = agents;
+        _sessions = sessions;
+        _sandboxPolicy = sandboxPolicy;
+        _logger = logger;
     }
 
     public async IAsyncEnumerable<object> Send(
@@ -65,6 +70,7 @@ public sealed class ChatHub : Hub
             ProviderOverride = req.Provider,
             PreloadSkills = req.Skills,
             MaxIterations = req.MaxIterations,
+            SandboxPolicy = _sandboxPolicy.Resolve(req, sessionId, req.Provider, req.Model),
         };
 
         await foreach (var chunk in agent.RunAsync(run, ct).ConfigureAwait(false))

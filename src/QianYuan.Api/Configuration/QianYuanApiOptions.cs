@@ -18,6 +18,8 @@ public sealed class QianYuanApiOptions
     public bool EnableVisionSkill { get; set; } = true;
     public CodeSkillOptions? CodeExecution { get; set; }
     public SkillDirectoryOptions[] SkillDirectories { get; set; } = Array.Empty<SkillDirectoryOptions>();
+    public SandboxLeaseOptions SandboxLease { get; set; } = new();
+    public SandboxWorkerOptions SandboxWorker { get; set; } = new();
 
     public McpServerEntry[] McpServers { get; set; } = Array.Empty<McpServerEntry>();
     public DingTalkConfig? DingTalk { get; set; }
@@ -125,6 +127,37 @@ public sealed class SkillDirectoryOptions
     public bool Recursive { get; set; } = true;
     public bool Enabled { get; set; } = true;
     public string IdPrefix { get; set; } = "skill";
+}
+
+public sealed class SandboxLeaseOptions
+{
+    public int TtlSeconds { get; set; } = 900;
+    public int CleanupIntervalSeconds { get; set; } = 30;
+}
+
+public sealed class SandboxWorkerOptions
+{
+    public string Mode { get; set; } = "local";
+    public string WorkerId { get; set; } = "local-sandbox-worker";
+    public string? BaseUrl { get; set; }
+    public string ExecutePath { get; set; } = "/api/internal/sandbox/code-exec";
+    public string HealthPath { get; set; } = "/health";
+    public string? AuthToken { get; set; }
+    public bool FallbackToLocal { get; set; } = true;
+    public int MaxRetries { get; set; } = 1;
+    public int RetryDelayMs { get; set; } = 100;
+    public int HealthCheckIntervalSeconds { get; set; } = 10;
+    public int CircuitBreakFailureThreshold { get; set; } = 3;
+    public int CircuitBreakOpenSeconds { get; set; } = 30;
+    public SandboxWorkerEndpointOptions[] Workers { get; set; } = Array.Empty<SandboxWorkerEndpointOptions>();
+}
+
+public sealed class SandboxWorkerEndpointOptions
+{
+    public string WorkerId { get; set; } = "sandbox-worker";
+    public string BaseUrl { get; set; } = string.Empty;
+    public string? AuthToken { get; set; }
+    public int Weight { get; set; } = 1;
 }
 
 public sealed class McpServerEntry

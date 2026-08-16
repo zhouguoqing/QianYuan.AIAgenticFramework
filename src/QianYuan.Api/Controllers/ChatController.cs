@@ -7,6 +7,7 @@ using QianYuan.Core.Models;
 using QianYuan.Core.Streaming;
 using QianYuan.Data.Entities;
 using QianYuan.Data.Repositories;
+using QianYuan.Api.Services;
 
 namespace QianYuan.Api.Controllers;
 
@@ -19,6 +20,7 @@ public sealed class ChatController : ControllerBase
     private readonly ISessionStore _sessions;
     private readonly IAgentRepository _agentRepository;
     private readonly IMemoryService _memory;
+    private readonly IChatSandboxPolicyService _sandboxPolicy;
     private readonly ILogger<ChatController> _logger;
 
     private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
@@ -29,6 +31,7 @@ public sealed class ChatController : ControllerBase
         ISessionStore sessions,
         IAgentRepository agentRepository,
         IMemoryService memory,
+        IChatSandboxPolicyService sandboxPolicy,
         ILogger<ChatController> logger)
     {
         _agents = agents;
@@ -36,6 +39,7 @@ public sealed class ChatController : ControllerBase
         _sessions = sessions;
         _agentRepository = agentRepository;
         _memory = memory;
+        _sandboxPolicy = sandboxPolicy;
         _logger = logger;
     }
 
@@ -133,6 +137,7 @@ public sealed class ChatController : ControllerBase
             PreloadSkills = BuildPreloadSkills(storeAgent, req.Skills),
             MaxIterations = req.MaxIterations,
             Metadata = BuildMetadata(req, resolvedProvider.ProviderId, modelOverride ?? resolvedProvider.DefaultModel),
+            SandboxPolicy = _sandboxPolicy.Resolve(req, sessionId, resolvedProvider.ProviderId, modelOverride ?? resolvedProvider.DefaultModel),
         };
 
         var streamInterrupted = false;

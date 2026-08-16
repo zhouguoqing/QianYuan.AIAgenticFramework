@@ -1,4 +1,5 @@
 using QianYuan.Core.Models;
+using QianYuan.Core.Sandbox;
 
 namespace QianYuan.Core.Abstractions;
 
@@ -38,6 +39,7 @@ public sealed class SkillInvocationContext
     public required string SessionId { get; init; }
     public required IServiceProvider Services { get; init; }
     public IReadOnlyDictionary<string, string>? Metadata { get; init; }
+    public SandboxPolicySnapshot? SandboxPolicy { get; init; }
 }
 
 /// <summary>Outcome of a tool invocation.</summary>
