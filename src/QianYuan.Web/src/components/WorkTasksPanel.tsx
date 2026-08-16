@@ -66,12 +66,42 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
   const [memberDraft, setMemberDraft] = useState<MemberDraft>(emptyMemberDraft)
   const [editingMemberId, setEditingMemberId] = useState<string | null>(null)
   const [events, setEvents] = useState<ExpertTeamExecutionEventDto[]>([])
+  const [taskQuery, setTaskQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState<'all' | '7d' | '30d'>('all')
+  const [resultTab, setResultTab] = useState<'overview' | 'artifacts' | 'files' | 'changes' | 'preview'>('overview')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const streamAbortRef = useRef<AbortController | null>(null)
 
   const managedTeam = useMemo(() => teams.find(t => t.id === manageTeamId) ?? null, [teams, manageTeamId])
   const selectedTaskTeam = useMemo(() => teams.find(t => t.id === selected?.task.teamId) ?? null, [teams, selected?.task.teamId])
+  const statusOptions = useMemo(
+    () => ['all', ...Array.from(new Set(tasks.map(t => t.status))).sort((a, b) => a.localeCompare(b))],
+    [tasks],
+  )
+  const filteredTasks = useMemo(() => {
+    const query = taskQuery.trim().toLowerCase()
+    const now = Date.now()
+    return tasks
+      .filter(task => {
+        if (statusFilter !== 'all' && task.status !== statusFilter) return false
+        if (dateFilter !== 'all') {
+          const limitDays = dateFilter === '7d' ? 7 : 30
+          const updated = new Date(task.updatedAt).getTime()
+          if (Number.isFinite(updated) && now - updated > limitDays * 24 * 60 * 60 * 1000) return false
+        }
+        if (!query) return true
+        return task.title.toLowerCase().includes(query)
+          || task.goal.toLowerCase().includes(query)
+          || task.status.toLowerCase().includes(query)
+      })
+      .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
+  }, [tasks, taskQuery, statusFilter, dateFilter])
+  const previewArtifact = useMemo(
+    () => selected?.artifacts.find(a => a.contentType.toLowerCase().includes('html') || a.name.toLowerCase().endsWith('.html')) ?? null,
+    [selected?.artifacts],
+  )
 
   useEffect(() => {
     void loadInitial()
@@ -153,6 +183,7 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
 
   async function openTask(id: string) {
     setError(null)
+    setResultTab('overview')
     await refreshTask(id)
   }
 
@@ -342,27 +373,38 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
           <aside className="worktask-list-pane">
             <form className="worktask-form" onSubmit={submitTask}>
               <label>
-                <span>Title</span>
-                <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Competitive analysis report" />
+                <span>任务标题</span>
+                <input value={title} onChange={e => setTitle(e.target.value)} placeholder="例如：竞品分析报告" />
               </label>
               <label>
-                <span>Goal</span>
-                <textarea value={goal} onChange={e => setGoal(e.target.value)} rows={5} required placeholder="Describe the deliverable you expect from the expert team." />
+                <span>任务目标</span>
+                <textarea value={goal} onChange={e => setGoal(e.target.value)} rows={5} required placeholder="描述预期输出、输入材料、约束条件和截止时间。" />
               </label>
               <label>
-                <span>Expert team</span>
+                <span>专家团队</span>
                 <select value={teamId} onChange={e => setTeamId(e.target.value)}>
                   {teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
                 </select>
               </label>
-              <button className="primary-inline-btn" disabled={busy}>{busy ? 'Working...' : '+ Create task'}</button>
+              <button className="primary-inline-btn" disabled={busy}>{busy ? '处理中...' : '+ 创建任务'}</button>
             </form>
             {error && <div className="alert-error compact">{error}</div>}
+            <div className="worktask-filter-bar">
+              <input value={taskQuery} onChange={e => setTaskQuery(e.target.value)} placeholder="搜索任务标题、描述、状态" />
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                {statusOptions.map(status => <option key={status} value={status}>{status === 'all' ? '全部状态' : status}</option>)}
+              </select>
+              <select value={dateFilter} onChange={e => setDateFilter(e.target.value as 'all' | '7d' | '30d')}>
+                <option value="all">全部时间</option>
+                <option value="7d">最近 7 天</option>
+                <option value="30d">最近 30 天</option>
+              </select>
+            </div>
             <div className="worktask-list">
-              {tasks.length === 0 && <div className="muted-small">No tasks yet</div>}
-              {tasks.map(task => <button key={task.id} className={`worktask-row ${selected?.task.id === task.id ? 'active' : ''}`} onClick={() => openTask(task.id)}>
+              {filteredTasks.length === 0 && <div className="muted-small">暂无匹配任务</div>}
+              {filteredTasks.map(task => <button key={task.id} className={`worktask-row ${selected?.task.id === task.id ? 'active' : ''}`} onClick={() => openTask(task.id)}>
                 <strong>{task.title}</strong>
-                <span>{task.status} · {task.stepCount} steps · {task.artifactCount} artifacts</span>
+                <span>{task.status} · {task.stepCount} 步骤 · {task.artifactCount} 产物</span>
               </button>)}
             </div>
           </aside>
@@ -370,12 +412,12 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
           <main className="worktask-detail-pane">
             <section className="team-admin-card">
               <div className="team-admin-head">
-                <h3>Expert Team Templates</h3>
+                <h3>专家团队模板</h3>
                 <div className="team-admin-actions">
                   <select value={templateId} onChange={e => setTemplateId(e.target.value)}>
                     {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
-                  <button className="primary-inline-btn" disabled={busy || !templateId} onClick={createTeamFromTemplate}>Create from template</button>
+                  <button className="primary-inline-btn" disabled={busy || !templateId} onClick={createTeamFromTemplate}>从模板创建</button>
                 </div>
               </div>
               {templateId && <p className="muted-small">{templates.find(t => t.id === templateId)?.description}</p>}
@@ -383,7 +425,7 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
 
             <section className="team-admin-card">
               <div className="team-admin-head">
-                <h3>Team Editor</h3>
+                <h3>团队编辑器</h3>
                 <select value={manageTeamId} onChange={e => setManageTeamId(e.target.value)}>
                   {teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
                 </select>
@@ -395,8 +437,8 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
                   <label className="wide"><span>Description</span><textarea rows={2} value={teamDraft.description} onChange={e => setTeamDraft({ ...teamDraft, description: e.target.value })} /></label>
                 </div>
                 <div className="team-admin-actions right">
-                  <button className="primary-inline-btn" disabled={busy || !teamDraft.name.trim()} onClick={saveTeam}>Save team</button>
-                  <button className="ghost" disabled={busy} onClick={removeTeam}>Delete team</button>
+                  <button className="primary-inline-btn" disabled={busy || !teamDraft.name.trim()} onClick={saveTeam}>保存团队</button>
+                  <button className="ghost" disabled={busy} onClick={removeTeam}>删除团队</button>
                 </div>
                 <div className="team-member-list">
                   {managedTeam.members.map(member => <div className="team-member-row" key={member.id}>
@@ -405,12 +447,12 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
                       <span>{member.roleId} · {member.executionMode} · {member.enabled ? 'Enabled' : 'Disabled'}</span>
                       <p>{member.responsibility}</p>
                     </div>
-                    <button className="ghost" onClick={() => editMember(member)}>Edit</button>
-                    <button className="ghost" onClick={() => removeMember(member.id)}>Delete</button>
+                    <button className="ghost" onClick={() => editMember(member)}>编辑</button>
+                    <button className="ghost" onClick={() => removeMember(member.id)}>删除</button>
                   </div>)}
                 </div>
                 <form className="member-form" onSubmit={saveMember}>
-                  <h4>{editingMemberId ? 'Edit member' : 'Add member'}</h4>
+                  <h4>{editingMemberId ? '编辑成员' : '新增成员'}</h4>
                   <div className="team-form-grid">
                     <label><span>Order</span><input value={memberDraft.memberOrder} onChange={e => setMemberDraft({ ...memberDraft, memberOrder: e.target.value })} placeholder="Auto" /></label>
                     <label><span>Role ID</span><input value={memberDraft.roleId} onChange={e => setMemberDraft({ ...memberDraft, roleId: e.target.value })} required /></label>
@@ -421,11 +463,11 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
                     <label className="wide"><span>Responsibility</span><textarea rows={2} value={memberDraft.responsibility} onChange={e => setMemberDraft({ ...memberDraft, responsibility: e.target.value })} required /></label>
                   </div>
                   <div className="team-admin-actions right">
-                    {editingMemberId && <button type="button" className="ghost" onClick={() => { setEditingMemberId(null); setMemberDraft(emptyMemberDraft) }}>Cancel edit</button>}
-                    <button className="primary-inline-btn" disabled={busy}>Save member</button>
+                    {editingMemberId && <button type="button" className="ghost" onClick={() => { setEditingMemberId(null); setMemberDraft(emptyMemberDraft) }}>取消编辑</button>}
+                    <button className="primary-inline-btn" disabled={busy}>保存成员</button>
                   </div>
                 </form>
-              </> : <div className="muted-small">Create a team from a template to start editing.</div>}
+              </> : <div className="muted-small">请先从模板创建团队，再进行成员配置。</div>}
             </section>
 
             {selected ? <section className="team-admin-card task-detail-card">
@@ -437,24 +479,32 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
                 <div className="worktask-actions">
                   <span className="mini-status">{selected.task.status}</span>
                   {runtime && <span className="mini-status">Runtime: {runtime.status}</span>}
-                  <button className="primary-inline-btn" disabled={busy} onClick={orchestrate}>Orchestrate</button>
-                  <button className="primary-inline-btn" disabled={busy} onClick={runStream}>Run stream</button>
-                  <button className="ghost" disabled={!busy && !runtime?.isRunning} onClick={cancel}>Cancel</button>
+                  <button className="primary-inline-btn" disabled={busy} onClick={orchestrate}>规划任务</button>
+                  <button className="primary-inline-btn" disabled={busy} onClick={runStream}>执行任务</button>
+                  <button className="ghost" disabled={!busy && !runtime?.isRunning} onClick={cancel}>中断执行</button>
                 </div>
               </div>
-              <div className="worktask-team-note">Bound team: {selectedTaskTeam?.name ?? selected.task.teamId ?? 'Not bound'}</div>
+              <div className="worktask-team-note">绑定团队：{selectedTaskTeam?.name ?? selected.task.teamId ?? '未绑定'}</div>
               {events.length > 0 && <div className="execution-log">
-                <h3>Execution stream</h3>
+                <h3>执行过程</h3>
                 {events.map((evt, idx) => <div className="execution-event" key={`${evt.at}-${idx}`}>
                   <strong>{evt.stepOrder ? `${evt.stepOrder}. ${evt.stepName}` : evt.type}</strong>
                   <span>{evt.status} · {evt.executionMode ?? 'Task'} · {new Date(evt.at).toLocaleTimeString()}</span>
                   {evt.message && <p>{evt.message}</p>}
                 </div>)}
               </div>}
-              <div className="worktask-columns">
+              <div className="worktask-result-tabs">
+                <button className={resultTab === 'overview' ? 'active' : ''} onClick={() => setResultTab('overview')}>概览</button>
+                <button className={resultTab === 'artifacts' ? 'active' : ''} onClick={() => setResultTab('artifacts')}>产物</button>
+                <button className={resultTab === 'files' ? 'active' : ''} onClick={() => setResultTab('files')}>工作空间文件</button>
+                <button className={resultTab === 'changes' ? 'active' : ''} onClick={() => setResultTab('changes')}>变更</button>
+                <button className={resultTab === 'preview' ? 'active' : ''} onClick={() => setResultTab('preview')}>网页预览</button>
+              </div>
+
+              {resultTab === 'overview' && <div className="worktask-columns">
                 <section>
-                  <h3>Steps</h3>
-                  {selected.steps.length === 0 && <div className="muted-small">No steps yet</div>}
+                  <h3>任务步骤</h3>
+                  {selected.steps.length === 0 && <div className="muted-small">暂无步骤</div>}
                   {selected.steps.map(step => <div className="worktask-step" key={step.id}>
                     <strong>{step.stepOrder}. {step.name}</strong>
                     <span>{step.status} · {step.executionMode}</span>
@@ -462,18 +512,65 @@ export function WorkTasksPanel({ provider, model, onClose }: Props) {
                   </div>)}
                 </section>
                 <section>
-                  <h3>Artifacts</h3>
-                  {selected.artifacts.length === 0 && <div className="muted-small">No artifacts yet</div>}
-                  {selected.artifacts.map(artifact => <div className="artifact-card" key={artifact.id}>
+                  <h3>产物摘要</h3>
+                  {selected.artifacts.length === 0 && <div className="muted-small">暂无产物</div>}
+                  {selected.artifacts.slice(0, 5).map(artifact => <div className="artifact-card" key={artifact.id}>
                     <div className="artifact-head">
                       <strong>{artifact.name}</strong>
                       <span>{Math.max(1, Math.ceil(artifact.sizeBytes / 1024))} KB</span>
                     </div>
-                    <pre>{artifact.content || artifact.filePath || '(empty)'}</pre>
+                    <pre>{artifact.filePath || artifact.contentType || '(empty)'}</pre>
                   </div>)}
                 </section>
-              </div>
-            </section> : <div className="knowledge-empty"><strong>Select or create a task</strong><span>Task steps and artifacts appear here.</span></div>}
+              </div>}
+
+              {resultTab === 'artifacts' && <section>
+                <h3>任务产物</h3>
+                {selected.artifacts.length === 0 && <div className="muted-small">暂无产物</div>}
+                {selected.artifacts.map(artifact => <div className="artifact-card" key={artifact.id}>
+                  <div className="artifact-head">
+                    <strong>{artifact.name}</strong>
+                    <span>{Math.max(1, Math.ceil(artifact.sizeBytes / 1024))} KB</span>
+                  </div>
+                  <pre>{artifact.content || artifact.filePath || '(empty)'}</pre>
+                </div>)}
+              </section>}
+
+              {resultTab === 'files' && <section>
+                <h3>工作空间文件</h3>
+                {selected.artifacts.filter(a => a.filePath).length === 0 && <div className="muted-small">暂无文件路径信息</div>}
+                {selected.artifacts.filter(a => a.filePath).map(artifact => <div className="worktask-step" key={artifact.id}>
+                  <strong>{artifact.name}</strong>
+                  <span>{artifact.contentType} · {Math.max(1, Math.ceil(artifact.sizeBytes / 1024))} KB</span>
+                  <p>{artifact.filePath}</p>
+                </div>)}
+              </section>}
+
+              {resultTab === 'changes' && <section>
+                <h3>变更</h3>
+                {selected.steps.filter(step => step.summary?.trim()).length === 0 && <div className="muted-small">暂无变更摘要</div>}
+                {selected.steps.filter(step => step.summary?.trim()).map(step => <div className="worktask-step" key={step.id}>
+                  <strong>{step.stepOrder}. {step.name}</strong>
+                  <span>{step.status} · {step.executionMode}</span>
+                  <p>{step.summary}</p>
+                </div>)}
+              </section>}
+
+              {resultTab === 'preview' && <section>
+                <h3>网页预览</h3>
+                {!previewArtifact && <div className="muted-small">暂无可预览的 HTML 产物</div>}
+                {previewArtifact && <div className="artifact-card">
+                  <div className="artifact-head">
+                    <strong>{previewArtifact.name}</strong>
+                    <span>HTML</span>
+                  </div>
+                  {previewArtifact.content
+                    ? <iframe title="artifact-preview" className="worktask-preview-frame" srcDoc={previewArtifact.content} />
+                    : <pre>{previewArtifact.filePath || '(empty)'}</pre>}
+                </div>}
+              </section>}
+
+            </section> : <div className="knowledge-empty"><strong>请选择或创建任务</strong><span>任务步骤、执行过程与产物会在这里展示。</span></div>}
           </main>
         </div>
       </div>

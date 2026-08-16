@@ -138,7 +138,7 @@ export function Sidebar(p: Props) {
 
   const fallbackTasks = [
     { title: '研究云快充切换特来电...', time: '17小时前', fresh: false },
-    { title: 'AI WorkPartner版本区别对比', time: '2天前', fresh: false },
+    { title: 'QianYuan 版本能力对比', time: '2天前', fresh: false },
     { title: 'QQ音乐耳机播放问题排查', time: '2天前', fresh: false },
     { title: '对比能源管理平台产品', time: '', fresh: true },
     { title: '下载山东高考英语真题答案', time: '6天前', fresh: false },
@@ -291,8 +291,6 @@ export function Sidebar(p: Props) {
           <span className="avatar-mark">{(p.userName ?? '访客').slice(0, 1).toUpperCase()}</span>
           <strong>{p.userName ?? '访客'}</strong>
         </button>
-        <button className="footer-icon" type="button" aria-label="通知">!</button>
-        <button className="footer-icon" type="button" aria-label="链接">↗</button>
       </div>
 
       {showSkillsManager && (

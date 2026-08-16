@@ -6,9 +6,9 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 24px;
+  padding: 64px 24px 44px;
   background:
-    radial-gradient(ellipse 80% 60% at 50% -20%, var(--accent-soft), transparent),
+    radial-gradient(ellipse 92% 78% at 48% -22%, #f5f6f3 0%, transparent 60%),
     var(--bg);
   overflow-y: auto;
 }
@@ -42,10 +42,10 @@
 }
 
 .home-hero {
-  width: min(680px, 100%);
+  width: min(646px, 100%);
   position: relative;
   display: block;
-  margin-bottom: 36px;
+  margin-bottom: 26px;
 }
 
 .hero-copy { min-width: 0; }
@@ -61,106 +61,91 @@
 
 .hero-copy h1 {
   margin: 0;
-  color: var(--text);
-  font-size: var(--font-size-hero);
-  line-height: 1.15;
-  font-weight: 850;
-  letter-spacing: -0.5px;
-}
-
-.hero-copy h1 span {
-  background: linear-gradient(135deg, var(--accent), #6366f1);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #202124;
+  font-size: clamp(42px, 6vw, 50px);
+  line-height: 1.07;
+  font-weight: 820;
+  letter-spacing: -1.2px;
 }
 
 /* Mode Tabs */
 .home-mode-tabs {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 7px;
   margin-top: 18px;
-  padding: 6px;
-  border-radius: var(--radius-lg);
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  padding: 0;
 }
 
 .home-mode-tabs button,
 .quick-task-row button {
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  background: var(--bg-elev);
-  color: var(--text-secondary);
-  padding: 8px 16px;
+  border: 1px solid #eaebe8;
+  border-radius: 12px;
+  background: #f8f9f6;
+  color: #4d5054;
+  padding: 8px 15px;
   font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 620;
   cursor: pointer;
-  transition: all var(--transition-spring);
-  box-shadow: var(--shadow-sm);
+  transition: all 0.16s ease;
+  box-shadow: none;
 }
 
 .home-mode-tabs button:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-  transform: translateY(-1px);
+  background: #f0f2ef;
+  color: #202124;
 }
 
 .home-mode-tabs button.active {
-  background: var(--text);
-  color: var(--bg-elev);
-  border-color: transparent;
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  background: #2e3134;
+  color: #fff;
+  border-color: #2e3134;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.15);
 }
 
 /* Quick Tasks */
 .quick-task-row {
-  width: min(680px, 100%);
+  width: min(646px, 100%);
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .quick-task-row button {
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid #e7e8e5;
+  background: #fff;
   min-height: 34px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .quick-task-row button:hover {
-  border-color: var(--accent-border);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  border-color: #d6d8d4;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.07);
 }
 
 /* Home Composer Shell */
 .home-composer-shell {
   position: relative !important;
-  width: min(680px, 100%);
-  border-radius: var(--radius-xl);
-  background: var(--bg-elev);
-  box-shadow: var(--shadow-lg);
-  transition: box-shadow var(--transition-smooth);
+  width: min(646px, 100%);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.2s ease;
 }
 
 .home-composer-shell:focus-within {
-  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.09);
 }
 
 .home-composer-shell .composer .images { display: none; }
 
 .home-composer-shell .composer {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
+  border: 1px solid #ececea;
+  border-radius: 14px;
   padding: 0;
   overflow: hidden;
 }
@@ -194,22 +179,22 @@
 }
 
 /* Mascot */
-.buddy-bot {
+.home-assistant-badge {
   position: absolute;
-  right: -24px;
-  bottom: -36px;
-  width: 76px;
+  right: 14px;
+  top: -48px;
+  width: 66px;
   height: auto;
   pointer-events: none;
-  z-index: 2;
-  animation: mascot-bob 4s ease-in-out infinite;
+  z-index: 3;
+  animation: mascot-bob 3.6s ease-in-out infinite;
 }
 
-.buddy-bot img {
+.home-assistant-badge img {
   width: 100%;
   height: auto;
   display: block;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.13));
 }
 
 @keyframes mascot-bob {
@@ -220,13 +205,14 @@
 
 /* ========== Responsive ========== */
 @media (max-width: 1060px) {
-  .home-stage { padding-top: 64px; }
-  .buddy-bot { width: 56px; right: -14px; bottom: -20px; }
+  .home-stage { padding-top: 48px; }
+  .home-assistant-badge { width: 56px; right: 8px; top: -38px; }
 }
 
 @media (max-width: 720px) {
-  .home-stage { padding: 60px 16px 28px; }
-  .hero-copy h1 { font-size: 32px; }
+  .home-stage { padding: 44px 16px 26px; }
+  .hero-copy h1 { font-size: 34px; }
+  .home-assistant-badge { width: 48px; top: -30px; right: 8px; }
 }
 
 @media (max-height: 780px) and (min-width: 721px) {

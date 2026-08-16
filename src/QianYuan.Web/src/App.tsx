@@ -225,8 +225,10 @@ export default function App() {
         />
         : <div className="main">
         {hasActiveChat ? <>
-          <div className="chat" ref={scrollerRef}>
-            {messages.map(m => <ChatMessageView key={m.id} msg={m} onRegenerateUserMessage={regenerateUserMessage} />)}
+          <div className="chat-layout">
+            <div className="chat" ref={scrollerRef}>
+              {messages.map(m => <div key={m.id} id={`msg-${m.id}`}><ChatMessageView msg={m} onRegenerateUserMessage={regenerateUserMessage} /></div>)}
+            </div>
           </div>
           <Composer
             busy={busy}
@@ -279,7 +281,7 @@ export default function App() {
         onOpenGrowthPlan={() => { setShowAccountMenu(false); setShowTasks(true) }}
               onOpenSettings={() => { setShowAccountMenu(false); toast.info('设置', '运行设置已在左侧栏提供，可配置 Agent、Provider、模型、技能和知识库。') }}
               onOpenHelp={() => { setShowAccountMenu(false); toast.info('帮助与反馈', '请把使用问题、改进建议或异常现象记录下来，当前本地版本会优先保留你的会话和任务上下文。') }}
-              onCheckUpdates={() => { setShowAccountMenu(false); toast.info('检查更新', '当前版本为 WorkPartner v0.1.0。本地开发版更新随仓库代码同步。') }}
+              onCheckUpdates={() => { setShowAccountMenu(false); toast.info('检查更新', '当前版本为 QianYuan v0.1.0。本地开发版更新随仓库代码同步。') }}
         onSignOut={signOut}
         onClose={() => setShowAccountMenu(false)}
       />}
@@ -336,7 +338,7 @@ function HomeLanding({
   onOpenSkillManager, onOpenConnectorManager,
   activeExpert, onClearExpert, seedText, seedNonce,
 }: HomeLandingProps) {
-  const [activeModeLabel, setActiveModeLabel] = useState('代码开发')
+  const [activeModeLabel, setActiveModeLabel] = useState('日常办公')
 
   const workModes = [
     { label: '日常办公', prompt: '帮我整理今天的工作事项，并给出可执行的优先级计划。' },
@@ -346,7 +348,7 @@ function HomeLanding({
   const taskTypes = [
     { label: '文档处理', prompt: '帮我把这份材料整理成结构化文档。' },
     { label: '金融服务', prompt: '帮我梳理这个金融业务场景的关键指标和分析框架。' },
-    { label: '高考我帮你', prompt: '帮我设计一份高考志愿咨询的信息收集表和分析流程。' },
+    { label: '数据分析及可视化', prompt: '帮我搭建一套数据分析与可视化方案，包含指标、图表和结论。' },
     { label: '更多', prompt: '根据我的目标，帮我推荐最合适的工作模式。' },
   ]
 
@@ -354,7 +356,7 @@ function HomeLanding({
     <main className="home-stage">
       <section className="home-hero">
         <div className="hero-copy">
-          <h1>AI WorkPartner<br />你的 AI 智能伙伴</h1>
+          <h1>QianYuan Workspace<br />你的职场智能中枢</h1>
           <div className="home-mode-tabs" aria-label="常用工作模式">
             {workModes.map(item => (
               <button
@@ -378,6 +380,9 @@ function HomeLanding({
       </div>
 
       <div className="home-composer-shell" style={{position:'relative'}}>
+        <div className="home-assistant-badge" aria-hidden="true">
+          <img src="/avatar-mascot.png" alt="" />
+        </div>
         <Composer
           busy={busy}
           onSubmit={onSubmit}
@@ -397,9 +402,6 @@ function HomeLanding({
           seedText={seedText}
           seedNonce={seedNonce}
         />
-        <div className="buddy-bot" aria-hidden="true" style={{position:'absolute',right:-20,top:'calc(100% + 6px)',width:70,zIndex:2}}>
-          <img src="/avatar-mascot.png" alt="" />
-        </div>
       </div>
     </main>
   )

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { AgentDto, ComposerMode, ImageGenerationOptions, ImagePart, ProviderDto, SkillManifestDto, WorkspaceContext } from '../types/api'
 import { listAgents, listProviders, listSkills, parseKnowledgeFile } from '../services/api'
 
@@ -45,6 +45,7 @@ export function Composer({
 }: Props) {
   const composerRef = useRef<HTMLDivElement>(null)
   const popoverRef = useRef<HTMLDivElement>(null)
+  const triggerRefs = useRef<Partial<Record<Exclude<Panel, null>, HTMLButtonElement | null>>>({})
   const [text, setText] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [parsingAttachments, setParsingAttachments] = useState(false)
@@ -59,6 +60,7 @@ export function Composer({
   const [permission, setPermission] = useState(() => localStorage.getItem('workpartner.permission') ?? 'full')
   const [imageOnly, setImageOnly] = useState(() => localStorage.getItem('workpartner.imageOnly') === 'true')
   const [workspaceRoots, setWorkspaceRoots] = useState<WorkspaceRoot[]>([])
+  const [popoverStyle, setPopoverStyle] = useState<CSSProperties>({})
   const ref = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -70,7 +72,12 @@ export function Composer({
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Node | null
       if (!target) return
-      if (!composerRef.current?.contains(target)) setPanel(null)
+      if (popoverRef.current?.contains(target)) return
+
+      const isTrigger = Object.values(triggerRefs.current).some(node => node?.contains(target))
+      if (isTrigger) return
+
+      setPanel(null)
     }
 
     function onKeyDown(event: KeyboardEvent) {
@@ -91,6 +98,33 @@ export function Composer({
     requestAnimationFrame(() => {
       if (popoverRef.current) popoverRef.current.scrollTop = 0
     })
+  }, [panel])
+
+  useEffect(() => {
+    if (!panel) {
+      setPopoverStyle({})
+      return
+    }
+
+    const activePanel = panel
+
+    function reposition() {
+      const composer = composerRef.current
+      const trigger = triggerRefs.current[activePanel]
+      if (!composer || !trigger) return
+
+      const composerRect = composer.getBoundingClientRect()
+      const triggerRect = trigger.getBoundingClientRect()
+      const left = Math.max(10, triggerRect.left - composerRect.left)
+      setPopoverStyle({ left: `${left}px` })
+    }
+
+    const frame = requestAnimationFrame(reposition)
+    window.addEventListener('resize', reposition)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.removeEventListener('resize', reposition)
+    }
   }, [panel])
 
   // Seed the composer text when a caller (e.g. summoning an expert) requests it.
@@ -252,6 +286,12 @@ export function Composer({
     setPanel(null)
   }
 
+  function bindTrigger(panelName: Exclude<Panel, null>) {
+    return (node: HTMLButtonElement | null) => {
+      triggerRefs.current[panelName] = node
+    }
+  }
+
   function openSkillManager() {
     onOpenSkillManager?.()
     setPanel(null)
@@ -277,6 +317,7 @@ export function Composer({
           value={text}
           placeholder={busy ? '正在生成…' : placeholderFor(mode, attachments.length)}
           onChange={e => { setText(e.target.value); autoSize(e.target) }}
+          onFocus={() => setPanel(null)}
           onKeyDown={onKey}
           onPaste={e => {
             for (const item of Array.from(e.clipboardData.items)) {
@@ -299,7 +340,7 @@ export function Composer({
       </div>}
 
       <div className="composer-toolbar">
-        <button className="tool-round" type="button" onClick={() => setPanel(panel === 'add' ? null : 'add')} aria-label="添加附件">+</button>
+        <button ref={bindTrigger('add')} className="tool-round" type="button" onClick={() => setPanel(panel === 'add' ? null : 'add')} aria-label="添加附件">+</button>
         {activeExpert && <span className="expert-chip" title={activeExpert.profession}>
           {activeExpert.avatarUrl
             ? <img src={activeExpert.avatarUrl} alt="" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
@@ -307,11 +348,12 @@ export function Composer({
           <span>{activeExpert.name}</span>
           <em onClick={e => { e.stopPropagation(); onClearExpert?.() }} title="取消召唤">×</em>
         </span>}
-        <button className="tool-chip workspace-chip" type="button" onClick={() => setPanel(panel === 'workspace' ? null : 'workspace')}>
+        <button ref={bindTrigger('workspace')} className="tool-chip workspace-chip" type="button" onClick={() => setPanel(panel === 'workspace' ? null : 'workspace')}>
           <span className="chip-icon" aria-hidden="true">□</span>
           <strong>选择工作空间</strong>
         </button>
         <button
+          ref={bindTrigger('permission')}
           className={`tool-chip permission-chip ${permission === 'full' ? 'danger' : ''}`}
           type="button"
           onClick={() => setPanel(panel === 'permission' ? null : 'permission')}>
@@ -319,8 +361,8 @@ export function Composer({
           <strong>{permissionLabel}</strong>
         </button>
         <span className="toolbar-spacer" />
-        <button className="tool-chip" type="button" onClick={() => setPanel(panel === 'expert' ? null : 'expert')}>{selectedAgent ? selectedAgentName : '专家'}</button>
-        <button className="tool-chip" type="button" onClick={() => setPanel(panel === 'skill' ? null : 'skill')}>{selectedSkills.length > 0 ? `技能 ${selectedSkills.length}` : '技能'}</button>
+        <button ref={bindTrigger('expert')} className="tool-chip" type="button" onClick={() => setPanel(panel === 'expert' ? null : 'expert')}>{selectedAgent ? selectedAgentName : '专家'}</button>
+        <button ref={bindTrigger('skill')} className="tool-chip" type="button" onClick={() => setPanel(panel === 'skill' ? null : 'skill')}>{selectedSkills.length > 0 ? `技能 ${selectedSkills.length}` : '技能'}</button>
         <button
           className={`tool-chip image-only-chip ${imageOnly ? 'active' : ''}`}
           type="button"
@@ -328,7 +370,7 @@ export function Composer({
           onClick={() => setImageOnly(value => !value)}>
           仅生图
         </button>
-        <button className="model-chip" type="button" onClick={() => setPanel(panel === 'model' ? null : 'model')}>{modelLabel}</button>
+        <button ref={bindTrigger('model')} className="model-chip" type="button" onClick={() => setPanel(panel === 'model' ? null : 'model')}>{modelLabel}</button>
         <button className="mic-btn" type="button" aria-label="语音输入">⌕</button>
         {busy
           ? <button className="stop-btn" onClick={onAbort}><span className="stop-btn-icon">■</span><span>中止</span></button>
@@ -348,7 +390,7 @@ export function Composer({
           e.currentTarget.value = ''
         }} />
 
-      {panel && <div ref={popoverRef} className={`composer-popover ${panel}-panel`}>
+      {panel && <div ref={popoverRef} className={`composer-popover ${panel}-panel`} style={popoverStyle}>
         {panel === 'add' && <>
           <button className="popover-row" type="button" onClick={openFiles}><span>◎</span><strong>添加文件</strong><em>›</em></button>
           <button className="popover-row" type="button" onClick={() => setPanel('mode')}><span>✦</span><strong>切换模式</strong><em>文生图 / 图生图</em></button>

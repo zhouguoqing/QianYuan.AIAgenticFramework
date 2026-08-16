@@ -457,7 +457,7 @@ export interface ExpertTeamExecutionEventDto {
   at: string
 }
 
-// Expert marketplace (WorkBuddy-style catalog)
+// Expert marketplace catalog
 export interface ExpertCategoryDto {
   id: string
   name: string

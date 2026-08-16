@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using QianYuan.Api.Controllers;
+using QianYuan.Api.Services;
 using QianYuan.Core.Abstractions;
 using QianYuan.Core.Memory;
 using QianYuan.Core.Models;
@@ -116,6 +117,7 @@ public class ChatControllerStreamTests
             sessions,
             repo.Object,
             new NoopMemoryService(),
+            new ChatSandboxPolicyService(),
             NullLogger<ChatController>.Instance);
     }
 

@@ -37,7 +37,7 @@ export function AuthPage({ onAuthenticated, onCancel, reason, initialMode = 'log
     <div className={onCancel ? 'auth-shell auth-modal-shell' : 'auth-shell'}>
       <div className="auth-panel">
         {onCancel && <button className="auth-close" type="button" onClick={onCancel} aria-label="关闭">×</button>}
-        <div className="auth-brand">WorkPartner</div>
+        <div className="auth-brand">QianYuan</div>
         <h1>{mode === 'login' ? '登录后继续' : '注册并开始使用'}</h1>
         {reason && <p>{reason}</p>}
         <div className="auth-benefits" aria-label="登录后能力">

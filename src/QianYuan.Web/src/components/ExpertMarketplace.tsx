@@ -117,6 +117,14 @@ export function ExpertMarketplace({ onBack, onLaunch, initialTopTab = 'experts' 
   const [form, setForm] = useState<ExpertForm>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [lastPromptByExpert, setLastPromptByExpert] = useState<Record<string, string>>(() => {
+    try {
+      const raw = localStorage.getItem('qianyuan.expert.lastPrompt')
+      return raw ? JSON.parse(raw) as Record<string, string> : {}
+    } catch {
+      return {}
+    }
+  })
 
   useEffect(() => {
     Promise.all([listExpertCategories(), listExpertScenarios(), listAgentStoreAgents().catch(() => [])])
@@ -159,8 +167,17 @@ export function ExpertMarketplace({ onBack, onLaunch, initialTopTab = 'experts' 
 
   function launch(prompt: string) {
     if (!detail) return
+    const next = { ...lastPromptByExpert, [detail.id]: prompt }
+    setLastPromptByExpert(next)
+    localStorage.setItem('qianyuan.expert.lastPrompt', JSON.stringify(next))
     onLaunch(prompt, detail)
     setDetail(null)
+  }
+
+  function continueLaunch() {
+    if (!detail) return
+    const previous = lastPromptByExpert[detail.id]
+    launch(previous || detail.defaultInitPrompt || `继续协助我完成${detail.profession}相关任务。`)
   }
 
   function startCreate() {
@@ -291,6 +308,11 @@ export function ExpertMarketplace({ onBack, onLaunch, initialTopTab = 'experts' 
           )}
 
           <section className="market-list">
+            <div className="expert-market-summary">
+              <div><span>专家总数</span><strong>{total}</strong></div>
+              <div><span>专家团</span><strong>{experts.filter(e => e.type === 'team').length}</strong></div>
+              <div><span>自定义专家</span><strong>{experts.filter(e => e.isCustom).length}</strong></div>
+            </div>
             <div className="market-list-head">
               <div className="kind-toggle">
                 <button className={kind === 'agent' ? 'active' : ''} type="button" onClick={() => setKind('agent')}>专家</button>
@@ -377,6 +399,7 @@ export function ExpertMarketplace({ onBack, onLaunch, initialTopTab = 'experts' 
                   <div className="ed-actions">
                     {detail.isCustom && <button className="ed-secondary" type="button" disabled={saving} onClick={() => startEdit(detail)}>编辑</button>}
                     {detail.isCustom && <button className="ed-danger" type="button" disabled={saving} onClick={() => removeCustomExpert(detail.id)}>删除</button>}
+                    <button className="ed-secondary" type="button" onClick={continueLaunch}>继续对话</button>
                     <button className="ed-summon" type="button" onClick={() => launch(detail.defaultInitPrompt || `你好，我需要${detail.profession}的帮助。`)}>召唤专家</button>
                   </div>
                 </div>
